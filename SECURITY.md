@@ -4,12 +4,15 @@
 
 Please do not open a public issue.
 
-Report privately through [GitHub Security Advisories](https://github.com/tenantlayer-io/tenantlayer/security/advisories/new),
-or email **security@tenantlayer.io**.
+**[Report it privately here.](https://github.com/tenantlayer-io/tenantlayer/security/advisories/new)**
+That form is visible only to the maintainers, and it is the fastest route.
 
 Please include the version, a description of the isolation failure, and the smallest
 reproduction you can manage. You will get an acknowledgement within 3 working days and an
 assessment within 10.
+
+If you cannot use GitHub, open a normal issue containing only the words "security report,
+please make contact" and nothing else — no details — and you will be contacted privately.
 
 ## What counts
 
