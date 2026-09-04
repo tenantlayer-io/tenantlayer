@@ -1,0 +1,31 @@
+name: Feature request
+description: Something TenantLayer should do and does not
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        TenantLayer's free core is governed by one rule: **free is correctness, paid is
+        operations, compliance and scale.** The free core is never crippled to sell the
+        paid one — if something is needed to build tenancy *correctly*, it belongs in the
+        free core, and saying so here is a good use of this form.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do that you cannot?
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What are you doing instead today?
+  - type: dropdown
+    id: placement
+    attributes:
+      label: Would a two-person startup need this before they have customers?
+      options:
+        - "Yes — it is needed to be correct"
+        - "No — it is needed to operate at scale or pass a review"
+        - "Not sure"
+    validations:
+      required: true

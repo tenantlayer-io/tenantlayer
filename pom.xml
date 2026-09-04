@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Deliberately NOT inheriting from spring-boot-starter-parent. That parent binds the
+    repackage goal, which builds a fat executable jar — right for an application, wrong
+    for a library. Libraries import the BOM for version alignment instead.
+  -->
+
+  <groupId>io.tenantlayer</groupId>
+  <artifactId>tenantlayer-spring-boot-starter</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>TenantLayer</name>
+  <description>The tenant isolation layer for Spring Boot + Postgres</description>
+  <url>https://tenantlayer.io</url>
+  <inceptionYear>2026</inceptionYear>
+
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>suchaitgaurav</id>
+      <name>Suchait Gaurav</name>
+      <url>https://tenantlayer.io</url>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/tenantlayer-io/tenantlayer.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/tenantlayer-io/tenantlayer.git</developerConnection>
+    <url>https://github.com/tenantlayer-io/tenantlayer</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/tenantlayer-io/tenantlayer/issues</url>
+  </issueManagement>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <spring-boot.version>3.5.3</spring-boot.version>
+    <surefire.version>3.2.5</surefire.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+
+    <!--
+      Optional: features 4 (JWT claim resolver) and 52 (membership verification) need
+      Spring Security, but an application using header or subdomain resolution must not be
+      forced to add a security filter chain it does not want. Optional keeps them off the
+      consumer's transitive classpath while still compiling and testing here.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!--
+      Optional: feature 16 propagates the tenant onto outbound calls. RestTemplate and
+      RestClient need nothing extra; WebClient needs WebFlux and Feign needs feign-core,
+      and neither should be forced on an application that uses the other.
+    -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-webflux</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>io.github.openfeign</groupId>
+      <artifactId>feign-core</artifactId>
+      <version>13.5</version>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Optional: features 17, 18 and 92. Only applications that use Kafka pay for it. -->
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!--
+      Optional: feature 105 ships Testcontainers fixtures in io.tenantlayer.test, so they
+      must compile here. Optional keeps Testcontainers off the runtime classpath of an
+      application that only uses the library, while still being available to anyone who
+      already has it for their own tests.
+    -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!--
+      io.tenantlayer.test ships to users, so it must compile against JUnit. Optional so
+      that nobody who only uses the runtime inherits JUnit transitively.
+      TODO: split into a separate tenantlayer-test artifact before publishing.
+    -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-commons</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>kafka</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${surefire.version}</version>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <!--
+      Feature 12. The library targets Java 17, so the virtual-thread tests cannot live in
+      the main test tree — they use APIs that do not exist there and would not compile.
+      This source directory is added only when the build is running on a JDK that has
+      them, which keeps `mvn test` on 17 working and still gives Loom real coverage.
+    -->
+    <profile>
+      <id>jdk21</id>
+      <activation>
+        <jdk>[21,)</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.testRelease>21</maven.compiler.testRelease>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <version>3.6.0</version>
+            <executions>
+              <execution>
+                <id>add-jdk21-tests</id>
+                <phase>generate-test-sources</phase>
+                <goals>
+                  <goal>add-test-source</goal>
+                </goals>
+                <configuration>
+                  <sources>
+                    <source>src/test/java21</source>
+                  </sources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!--
+      Feature 110. Boot 3.5 pins Hibernate 6.6; this runs the whole suite again against
+      Hibernate 7 so "supports 6 and 7" is a tested claim rather than an aspiration.
+    -->
+    <profile>
+      <id>hibernate7</id>
+      <dependencies>
+        <!--
+          Declared directly, with a version, rather than by overriding the BOM's
+          hibernate.version property. Properties defined inside an *imported* BOM are
+          resolved in that BOM's own context and cannot be overridden from here — only
+          inheriting from spring-boot-starter-parent gives you that, and this project
+          deliberately does not inherit from it. Setting the property looks like it works
+          and silently changes nothing, so the version goes on the dependency instead,
+          where "nearest wins" makes it authoritative.
+        -->
+        <dependency>
+          <groupId>org.hibernate.orm</groupId>
+          <artifactId>hibernate-core</artifactId>
+          <version>7.0.2.Final</version>
+        </dependency>
+        <!-- Hibernate 7 implements Jakarta Persistence 3.2; Boot 3.5 ships 3.1. -->
+        <dependency>
+          <groupId>jakarta.persistence</groupId>
+          <artifactId>jakarta.persistence-api</artifactId>
+          <version>3.2.0</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <!--
+      Feature 126. Everything Maven Central requires, and nothing that runs on an ordinary
+      build: signing prompts for a passphrase and javadoc generation is slow, so both are
+      confined to "mvn -Prelease deploy".
+
+      Before the first deploy you still need to do three things once, none of which can
+      live in this file because none of them is a secret this repo should hold:
+        1. create a GPG key and publish it to keys.openpgp.org
+        2. register the io.tenantlayer namespace at https://central.sonatype.com
+        3. put the portal token in ~/.m2/settings.xml as server id "central"
+    -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.3.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.11.2</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <doclint>none</doclint>
+              <quiet>true</quiet>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.7.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>

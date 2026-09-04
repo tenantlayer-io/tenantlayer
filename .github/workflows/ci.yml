@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  library:
+    name: library (JDK ${{ matrix.jdk }}${{ matrix.profile && format(', {0}', matrix.profile) || '' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The baseline the library targets.
+          - jdk: '17'
+            profile: ''
+          # Feature 110 is a claim about two Hibernate versions, so both are run.
+          - jdk: '17'
+            profile: 'hibernate7'
+          # On 21 the jdk21 profile self-activates and adds the virtual-thread tests.
+          - jdk: '21'
+            profile: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.jdk }}
+          distribution: temurin
+          cache: maven
+
+      # Testcontainers needs a Docker daemon; ubuntu-latest runners ship one.
+      - name: Run tests
+        run: mvn -B test ${{ matrix.profile && format('-P{0}', matrix.profile) || '' }}
+
+  example:
+    name: example consumes the built artifact
+    runs-on: ubuntu-latest
+    needs: library
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # The example depends on the published artifact rather than on source, deliberately:
+      # it exists to prove the library works for someone who is not the library. Installing
+      # first is what makes that true here as well as locally.
+      - name: Install the library
+        run: mvn -B -q install -DskipTests
+
+      - name: Run the example's tests
+        working-directory: examples/order-service
+        run: mvn -B test

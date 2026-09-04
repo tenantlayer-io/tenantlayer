@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "TenantLayer demo (orders)",
+      "Group": "Servers",
+      "Host": "tl-orders-pg",
+      "Port": 5432,
+      "MaintenanceDB": "orders",
+      "Username": "admin",
+      "SSLMode": "prefer",
+      "Comment": "admin is a SUPERUSER and bypasses row-level security, so you will see every tenant's rows. That is why the service connects as orders_app instead."
+    }
+  }
+}

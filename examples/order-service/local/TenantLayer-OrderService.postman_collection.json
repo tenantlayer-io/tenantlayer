@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "TenantLayer — Order Service",
+    "description": "Drive the order-service and watch tenant isolation happen with no tenancy code in the service itself.\n\nSet the `tenant` collection variable to switch identity. Nothing else changes.\n\nRun the folder top to bottom: the isolation checks depend on ids captured by the first two requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "tenant", "value": "acme" },
+    { "key": "acmeOrderId", "value": "" },
+    { "key": "globexOrderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Place order as acme",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('acmeOrderId', body.id);",
+              "pm.test('database stamped the tenant, the service never sent one', () =>",
+              "  pm.expect(body.tenantId).to.eql('acme'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Tenant-ID", "value": "acme" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer\": \"Wile E. Coyote\",\n  \"item\": \"Anvil\",\n  \"amountCents\": 4999\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      }
+    },
+    {
+      "name": "2. Place order as globex",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('globexOrderId', body.id);",
+              "pm.test('tenant is globex', () => pm.expect(body.tenantId).to.eql('globex'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-Tenant-ID", "value": "globex" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer\": \"Hank Scorpio\",\n  \"item\": \"Doomsday device\",\n  \"amountCents\": 999999\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      }
+    },
+    {
+      "name": "3. List orders as acme",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ok', () => pm.response.to.have.status(200));",
+              "const rows = pm.response.json();",
+              "pm.test('every row belongs to acme', () =>",
+              "  rows.forEach(r => pm.expect(r.tenantId).to.eql('acme')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Tenant-ID", "value": "acme" }],
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      }
+    },
+    {
+      "name": "4. List orders as globex",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ok', () => pm.response.to.have.status(200));",
+              "const rows = pm.response.json();",
+              "pm.test('every row belongs to globex', () =>",
+              "  rows.forEach(r => pm.expect(r.tenantId).to.eql('globex')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Tenant-ID", "value": "globex" }],
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      }
+    },
+    {
+      "name": "5. acme reads its own order — expect 200",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('acme can read its own order', () => pm.response.to.have.status(200));"]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Tenant-ID", "value": "acme" }],
+        "url": {
+          "raw": "{{baseUrl}}/orders/{{acmeOrderId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["orders", "{{acmeOrderId}}"]
+        }
+      }
+    },
+    {
+      "name": "6. acme steals globex's order by id — expect 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404, and note it is 404 not 403 — a 403 would confirm the row exists', () =>",
+              "  pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Tenant-ID", "value": "acme" }],
+        "url": {
+          "raw": "{{baseUrl}}/orders/{{globexOrderId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["orders", "{{globexOrderId}}"]
+        }
+      }
+    },
+    {
+      "name": "7. No tenant header — expect 400",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('rejected, not served an empty list', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      }
+    },
+    {
+      "name": "8. Any tenant you like — {{tenant}}",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-Tenant-ID", "value": "{{tenant}}" }],
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      },
+      "description": "Change the `tenant` collection variable and re-send. Try initech, or a tenant that has never placed an order — you get an empty list, never someone else's rows."
+    }
+  ]
+}

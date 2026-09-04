@@ -1,0 +1,21 @@
+# Build output
+target/
+build/
+out/
+*.class
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

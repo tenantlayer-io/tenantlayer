@@ -1,0 +1,53 @@
+name: Isolation failure
+description: One tenant could reach another tenant's data
+labels: ["isolation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **If this is exploitable, do not file it here.** See
+        [SECURITY.md](https://github.com/tenantlayer-io/tenantlayer/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: TenantLayer version
+    validations:
+      required: true
+  - type: input
+    id: stack
+    attributes:
+      label: Spring Boot / Hibernate / Postgres versions
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Your tenantlayer.* configuration
+      render: properties
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: What role does the application connect as?
+      description: >
+        Superusers and table owners without FORCE ROW LEVEL SECURITY bypass policies by
+        design. This is the single most common cause, so it is asked first.
+      options:
+        - A least-privileged role, neither superuser nor table owner
+        - The table owner
+        - A superuser
+        - I do not know
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened, and what did
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest reproduction you can manage
+      description: A failing test is ideal. The Testcontainers fixtures in docs/testing.md make one short.
