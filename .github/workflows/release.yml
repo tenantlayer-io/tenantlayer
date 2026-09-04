@@ -1,0 +1,90 @@
+name: Release
+
+# Releasing is a tag push and nothing else:
+#
+#     mvn versions:set -DnewVersion=0.1.0 -DgenerateBackupPoms=false   # optional, see below
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# The version is taken from the tag, so main stays on -SNAPSHOT and there is no commit
+# that exists only to change a number. Nothing is signed or uploaded from a laptop, which
+# means the GPG key and the Central token live in GitHub secrets rather than in a shell
+# history or a settings.xml someone might commit.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without the leading v (e.g. 0.1.0)'
+        required: true
+
+jobs:
+  release:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing $VERSION"
+
+      # Central rejects SNAPSHOTs, and a release is permanent. Better to fail here with a
+      # clear message than to have the upload rejected halfway through.
+      - name: Refuse to publish a snapshot
+        run: |
+          case "${{ steps.version.outputs.version }}" in
+            *SNAPSHOT*) echo "::error::Refusing to publish a SNAPSHOT version"; exit 1 ;;
+          esac
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      # A release that fails its own isolation tests must not reach Central, where it can
+      # never be taken back.
+      - name: Run the full test suite
+        run: mvn -B test
+
+      - name: Set the release version
+        run: mvn -B versions:set -DnewVersion=${{ steps.version.outputs.version }} -DgenerateBackupPoms=false
+
+      - name: Verify the example still builds against it
+        run: |
+          mvn -B -q install -DskipTests
+          cd examples/order-service
+          mvn -B -q versions:use-dep-version \
+            -Dincludes=io.tenantlayer:tenantlayer-spring-boot-starter \
+            -DdepVersion=${{ steps.version.outputs.version }} \
+            -DforceVersion=true -DgenerateBackupPoms=false
+          mvn -B test
+
+      - name: Deploy to Central
+        run: mvn -B -Prelease deploy -DskipTests
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: What happens next
+        run: |
+          echo "Uploaded as a STAGED deployment (autoPublish is false)."
+          echo "Go to https://central.sonatype.com/publishing to review and click Publish."
+          echo "Once published it is permanent and cannot be withdrawn."

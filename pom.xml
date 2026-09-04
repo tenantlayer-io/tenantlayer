@@ -134,9 +134,14 @@
     </dependency>
 
     <!--
-      io.tenantlayer.test ships to users, so it must compile against JUnit. Optional so
-      that nobody who only uses the runtime inherits JUnit transitively.
-      TODO: split into a separate tenantlayer-test artifact before publishing.
+      io.tenantlayer.test ships to users, so it must compile against JUnit and
+      Testcontainers. Both are optional, and that is load-bearing: verified against the
+      example, a consumer inherits neither on its runtime classpath.
+
+      Deliberately one artifact rather than a separate tenantlayer-test, for 0.x. Since
+      nothing leaks, the split would buy purity at the cost of the "one dependency"
+      promise. Revisit at 1.0, where the old classes can remain as deprecated forwarders
+      for a release rather than breaking anyone.
     -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
@@ -305,6 +310,17 @@
                 <goals>
                   <goal>sign</goal>
                 </goals>
+                <configuration>
+                  <!--
+                    Loopback pinentry so the passphrase can come from
+                    MAVEN_GPG_PASSPHRASE when this runs unattended in CI. Harmless
+                    locally, where gpg-agent still prompts.
+                  -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
               </execution>
             </executions>
           </plugin>
