@@ -84,6 +84,12 @@ public final class PostgresSupport {
         return new HikariDataSource(cfg);
     }
 
+    /** Runs arbitrary setup SQL as the privileged user. */
+    public static void executeAsAdmin(String sql) {
+        start();
+        execute(sql);
+    }
+
     private static void execute(String sql) {
         try (Connection connection = privileged.getConnection();
              Statement statement = connection.createStatement()) {

@@ -39,6 +39,18 @@ public class TenantLayerProperties {
     /** Prefix the path-segment resolver matches, e.g. "/t" for /t/acme/orders. */
     private String pathPrefix = PathSegmentTenantResolver.DEFAULT_PREFIX;
 
+    /**
+     * Feature 24 — how connections are isolated. Changing this is start-up configuration,
+     * never per request.
+     *
+     * <p>Note that the three strategies fail closed <em>differently</em> when no tenant is
+     * bound: row-level security yields an empty result set, schema-per-tenant raises an
+     * unresolved-relation error. All are safe, but an application that silently copes with
+     * empty results will fail loudly under the other, so switching is not
+     * behaviour-preserving on the no-tenant path.
+     */
+    private Strategy strategy = Strategy.ROW_LEVEL_SECURITY;
+
     /** Feature 4 — JWT claim the tenant is read from. */
     private String jwtClaim = JwtClaimTenantResolver.DEFAULT_CLAIM;
 
@@ -55,6 +67,13 @@ public class TenantLayerProperties {
     private final Discriminator discriminator = new Discriminator();
     private final Caching cache = new Caching();
     private final Registry registry = new Registry();
+
+    public enum Strategy {
+        /** One shared schema; Postgres row-level security enforces. The default. */
+        ROW_LEVEL_SECURITY,
+        /** One schema per tenant on a shared pool, selected by search_path. */
+        SCHEMA_PER_TENANT
+    }
 
     public enum Source {
         HEADER, SUBDOMAIN, PATH, JWT;
@@ -99,6 +118,9 @@ public class TenantLayerProperties {
     /** Features 21 and 30. */
     public static class Schema {
 
+        /** Prefix for the per-tenant schema name under SCHEMA_PER_TENANT. */
+        private String prefix = "tenant_";
+
         /** Column that marks a table tenant-scoped. */
         private String tenantColumn = io.tenantlayer.schema.TenantScopedEntityScanner
                 .DEFAULT_TENANT_COLUMN;
@@ -113,6 +135,14 @@ public class TenantLayerProperties {
          * everyone is supposed to see.
          */
         private java.util.Set<String> excludes = new java.util.LinkedHashSet<>();
+
+        public String getPrefix() {
+            return prefix;
+        }
+
+        public void setPrefix(String prefix) {
+            this.prefix = prefix;
+        }
 
         public String getTenantColumn() {
             return tenantColumn;
@@ -270,6 +300,14 @@ public class TenantLayerProperties {
 
     public void setUnscopedPaths(List<String> unscopedPaths) {
         this.unscopedPaths = unscopedPaths;
+    }
+
+    public Strategy getStrategy() {
+        return strategy;
+    }
+
+    public void setStrategy(Strategy strategy) {
+        this.strategy = strategy;
     }
 
     public String getJwtClaim() {

@@ -8,6 +8,9 @@ import io.tenantlayer.core.TenantResolver;
 import io.tenantlayer.core.TenantResolverChain;
 import io.tenantlayer.core.TenantTaskDecorator;
 import io.tenantlayer.hibernate.TenantContextIdentifierResolver;
+import io.tenantlayer.strategy.RowLevelSecurityStrategy;
+import io.tenantlayer.strategy.SchemaPerTenantStrategy;
+import io.tenantlayer.strategy.TenantConnectionStrategy;
 import io.tenantlayer.security.ClaimTenantMembershipVerifier;
 import io.tenantlayer.security.TenantMembershipVerifier;
 import io.tenantlayer.web.HeaderTenantResolver;
@@ -72,17 +75,38 @@ public class TenantLayerAutoConfiguration {
      * here would force the enclosing configuration to initialise too early.
      */
     @Bean
-    static BeanPostProcessor tenantLayerDataSourcePostProcessor() {
+    static BeanPostProcessor tenantLayerDataSourcePostProcessor(
+            ObjectProvider<TenantLayerProperties> properties) {
+
         return new BeanPostProcessor() {
             @Override
             public Object postProcessAfterInitialization(Object bean, String beanName)
                     throws BeansException {
                 if (bean instanceof DataSource dataSource
                         && !(bean instanceof TenantAwareDataSource)) {
-                    return new TenantAwareDataSource(dataSource);
+                    TenantLayerProperties props = properties.getIfAvailable();
+                    return new TenantAwareDataSource(dataSource, strategyFor(props, dataSource));
                 }
                 return bean;
             }
+        };
+    }
+
+    /**
+     * Row-level security unless configured otherwise, so upgrading changes nothing. The
+     * strategy is chosen once at start-up — selecting it per request would be a way to
+     * read another tenant's data by changing one property.
+     */
+    private static TenantConnectionStrategy strategyFor(
+            TenantLayerProperties properties, DataSource dataSource) {
+
+        if (properties == null) {
+            return new RowLevelSecurityStrategy(dataSource);
+        }
+        return switch (properties.getStrategy()) {
+            case ROW_LEVEL_SECURITY -> new RowLevelSecurityStrategy(dataSource);
+            case SCHEMA_PER_TENANT ->
+                    new SchemaPerTenantStrategy(dataSource, properties.getSchema().getPrefix());
         };
     }
 
