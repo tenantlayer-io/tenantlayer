@@ -111,6 +111,50 @@ for.
 
 ---
 
+## The signing key
+
+Releases are signed with:
+
+```
+Suchait Gaurav <suchaitgaurav@gmail.com>
+rsa4096  key ID 6464619381B491C9
+fingerprint 787D91F1 EAEB FAC8 265A 3AFA 6464 6193 81B4 91C9
+```
+
+Published on `keyserver.ubuntu.com` and `keys.openpgp.org`. To verify a release yourself:
+
+```bash
+gpg --keyserver keyserver.ubuntu.com --recv-keys 6464619381B491C9
+gpg --verify tenantlayer-spring-boot-starter-0.1.0.jar.asc \
+             tenantlayer-spring-boot-starter-0.1.0.jar
+```
+
+The private key and its revocation certificate are held offline. If the key is ever
+compromised, the revocation certificate is published and this section is updated with a
+replacement fingerprint.
+
+## Things that have actually gone wrong
+
+Kept because each one cost time and none is obvious.
+
+**A "failed" release that actually uploaded.** `central-publishing-maven-plugin` 0.7.0
+throws `UnrecognizedPropertyException: Unrecognized field "warnings"` while reading the
+deployment status — *after* the bundle has uploaded successfully. The build goes red, the
+artifact is staged and publishable. Look for `Uploaded bundle successfully, deploymentId:`
+in the log before assuming nothing happened. Fixed by using 0.11.0 or later.
+
+**`pbcopy` losing the key.** `gpg --armor --export-secret-keys KEY | pbcopy` puts the key
+on the clipboard silently. Copying anything else afterwards — a command to paste into
+chat, say — overwrites it, and you paste the wrong thing into the secret with no error.
+Export to a file instead.
+
+**A stray comment in the key UID.** Typing `O` at gpg's `Comment:` prompt rather than at
+the `(O)kay` confirmation produces `Suchait Gaurav (O) <...>` as your permanent public
+identity. Keyservers never forget, so fix it before publishing the key, not after.
+
+**No passphrase prompt.** If GPG exits silently without asking, `export GPG_TTY=$(tty)`
+first — it cannot draw the prompt without knowing the terminal.
+
 ## What you cannot undo
 
 **A published version is permanent.** Central does not allow deletion or replacement; the

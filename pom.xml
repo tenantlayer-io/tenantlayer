@@ -327,7 +327,14 @@
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>0.7.0</version>
+            <!--
+              0.11.0, not 0.7.0. Sonatype added a "warnings" field to the deployment
+              status response; 0.7.0 deserialises that response strictly and dies with
+              UnrecognizedPropertyException *after* a successful upload. The release
+              looks failed while the artifact is in fact staged and publishable, which
+              is a confusing five minutes. Keep this reasonably current.
+            -->
+            <version>0.11.0</version>
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
