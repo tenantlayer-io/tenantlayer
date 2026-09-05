@@ -264,6 +264,13 @@ cd examples/order-service && mvn test
 On JDK 21+ the `jdk21` profile activates automatically and adds the virtual-thread tests.
 Tests need Docker — Testcontainers starts Postgres, and Kafka for the messaging tests.
 
+## Roadmap
+
+[What is planned](ROADMAP.md), and what is already shipped. Everything unbuilt is an
+[open issue](https://github.com/tenantlayer-io/tenantlayer/issues) — start with a
+[good first issue](https://github.com/tenantlayer-io/tenantlayer/labels/good%20first%20issue)
+if you are looking for a way in.
+
 ## Contributing
 
 [CONTRIBUTING.md](CONTRIBUTING.md). One rule matters more than the rest: every isolation
