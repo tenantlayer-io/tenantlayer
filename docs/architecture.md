@@ -2,38 +2,10 @@
 
 ## The path of one request
 
-```
-  HTTP request
-       │
-       ▼
-  ┌─────────────────────┐
-  │ Spring Security     │  authenticates (only when JWT resolution
-  │ filter chain        │  or membership verification is enabled)
-  └─────────┬───────────┘
-            ▼
-  ┌─────────────────────┐
-  │ TenantFilter        │  1. resolve  → which tenant does this claim to be?
-  │                     │  2. verify   → is the caller entitled to it?
-  │                     │  3. bind     → TenantContext.enter(scope)
-  └─────────┬───────────┘
-            ▼
-  ┌─────────────────────┐
-  │ your controller     │  no tenant parameter, no header read, no filter
-  │ your service        │  no findByTenantId, no @Query
-  │ your repository     │
-  └─────────┬───────────┘
-            ▼
-  ┌─────────────────────┐
-  │ TenantAwareDataSource│ on every checkout:
-  │                     │   select set_config('tenantlayer.tenant', ?, false)
-  └─────────┬───────────┘
-            ▼
-  ┌─────────────────────┐
-  │ Postgres            │  the policy decides which rows exist
-  │ row-level security  │
-  └─────────────────────┘
-                          finally: TenantContext.exit(previous)
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/architecture-dark.png">
+  <img alt="A request enters, Spring Security optionally authenticates, TenantFilter resolves and verifies and binds the tenant, your own code runs with no knowledge of tenancy, TenantAwareDataSource publishes the tenant onto the connection on every checkout, and Postgres row-level security is the only component that enforces." src="images/architecture-light.png" width="1040">
+</picture>
 
 The important property is that **nothing in the middle knows about tenancy**. Your
 controller, service and repository are written as if the application had one customer. The

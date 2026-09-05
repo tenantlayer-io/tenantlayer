@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="700" viewBox="0 0 1040 700" role="img" aria-label="How a request flows through TenantLayer">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a1a1aa"/></marker></defs>
+<rect width="1040" height="700" fill="#ffffff"/>
+<rect x="40" y="20" width="520" height="40" rx="8" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.25"/>
+<text x="58" y="45" font-family="ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="#18181b">HTTP request</text>
+<line x1="300.0" y1="60" x2="300.0" y2="81" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="40" y="88" width="520" height="58" rx="8" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.25" stroke-dasharray="5 4"/>
+<text x="58" y="113" font-family="ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="#18181b">Spring Security filter chain</text>
+<text x="58" y="134" font-family="ui-sans-serif,system-ui,sans-serif" xml:space="preserve" font-size="12.5" fill="#52525b">authenticates — only when JWT resolution or membership is enabled</text>
+<line x1="584" y1="96" x2="584" y2="152" stroke="#d4d4d8" stroke-width="2"/>
+<text x="600" y="108" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#71717a">Optional</text>
+<text x="600" y="124" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#71717a">Absent for header or</text>
+<text x="600" y="140" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#71717a">subdomain resolution</text>
+<line x1="300.0" y1="146" x2="300.0" y2="175" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="40" y="182" width="520" height="96" rx="8" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.25"/>
+<text x="58" y="207" font-family="ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="#18181b">TenantFilter</text>
+<text x="58" y="228" font-family="ui-sans-serif,system-ui,sans-serif" xml:space="preserve" font-size="12.5" fill="#52525b">1.  resolve   which tenant does this request claim to be?</text>
+<text x="58" y="245" font-family="ui-sans-serif,system-ui,sans-serif" xml:space="preserve" font-size="12.5" fill="#52525b">2.  verify    is the caller entitled to that tenant?</text>
+<text x="58" y="262" font-family="ui-sans-serif,system-ui,sans-serif" xml:space="preserve" font-size="12.5" fill="#52525b">3.  bind      TenantContext.enter(scope)</text>
+<line x1="584" y1="188" x2="584" y2="244" stroke="#d4d4d8" stroke-width="2"/>
+<text x="600" y="200" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#b91c1c">Fails closed here</text>
+<text x="600" y="216" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#b91c1c">400 — no tenant resolved</text>
+<text x="600" y="232" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#b91c1c">403 — not a member</text>
+<line x1="300.0" y1="278" x2="300.0" y2="307" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="40" y="314" width="520" height="84" rx="8" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.25"/>
+<text x="58" y="339" font-family="ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="#18181b">Your controller · service · repository</text>
+<text x="58" y="360" font-family="ui-sans-serif,system-ui,sans-serif" xml:space="preserve" font-size="12.5" fill="#52525b">no tenant parameter · no header read · no findByTenantId</text>
+<text x="58" y="377" font-family="ui-sans-serif,system-ui,sans-serif" xml:space="preserve" font-size="12.5" fill="#52525b">written as though the application had one customer</text>
+<line x1="584" y1="324" x2="584" y2="380" stroke="#d4d4d8" stroke-width="2"/>
+<text x="600" y="336" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#71717a">Knows nothing</text>
+<text x="600" y="352" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#71717a">about tenancy</text>
+<text x="600" y="368" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#71717a">Nothing to forget</text>
+<line x1="300.0" y1="398" x2="300.0" y2="427" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="40" y="434" width="520" height="66" rx="8" fill="#ffffff" stroke="#d4d4d8" stroke-width="1.25"/>
+<text x="58" y="459" font-family="ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="#18181b">TenantAwareDataSource</text>
+<text x="58" y="480" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" xml:space="preserve" font-size="11.5" fill="#3f3f46">select set_config('tenantlayer.tenant', ?, false)</text>
+<line x1="584" y1="440" x2="584" y2="496" stroke="#d4d4d8" stroke-width="2"/>
+<text x="600" y="452" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#71717a">On every checkout</text>
+<text x="600" y="468" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#71717a">Never 'reset on return' —</text>
+<text x="600" y="484" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#71717a">a missed reset leaks</text>
+<line x1="300.0" y1="500" x2="300.0" y2="545" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="40" y="552" width="520" height="86" rx="8" fill="#f0fdfa" stroke="#5eead4" stroke-width="1.25"/>
+<text x="58" y="577" font-family="ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="#18181b">Postgres — row-level security</text>
+<text x="58" y="598" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" xml:space="preserve" font-size="11.5" fill="#3f3f46">using (tenant_id = nullif(</text>
+<text x="58" y="615" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" xml:space="preserve" font-size="11.5" fill="#3f3f46">          current_setting('tenantlayer.tenant', true), ''))</text>
+<line x1="584" y1="562" x2="584" y2="618" stroke="#d4d4d8" stroke-width="2"/>
+<text x="600" y="574" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#0f766e">The only thing that enforces</text>
+<text x="600" y="590" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#0f766e">No tenant → no rows,</text>
+<text x="600" y="606" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="#0f766e">never all rows</text>
+<text x="40" y="682" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#71717a">Unwound afterwards in a finally block — container threads are pooled, and a request that leaves its tenant behind hands it to the next one.</text>
+</svg>
