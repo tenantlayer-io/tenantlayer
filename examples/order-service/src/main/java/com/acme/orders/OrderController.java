@@ -24,10 +24,13 @@ public class OrderController {
 
     private final OrderRepository orders;
     private final OrderSummaryService summaries;
+    private final OrderStatsService stats;
 
-    public OrderController(OrderRepository orders, OrderSummaryService summaries) {
+    public OrderController(OrderRepository orders, OrderSummaryService summaries,
+                           OrderStatsService stats) {
         this.orders = orders;
         this.summaries = summaries;
+        this.stats = stats;
     }
 
     public record PlaceOrder(String customer, String item, long amountCents) {
@@ -48,6 +51,12 @@ public class OrderController {
     @GetMapping("/summary")
     public OrderSummary summary() throws Exception {
         return summaries.computeAsync().get(10, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    /** Cached, with a key identical for every tenant. Still isolated. */
+    @GetMapping("/stats")
+    public java.util.Map<String, Long> stats() {
+        return java.util.Map.of("orderCount", stats.orderCount());
     }
 
     @GetMapping("/{id}")
