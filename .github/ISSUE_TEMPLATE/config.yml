@@ -6,3 +6,6 @@ contact_links:
   - name: Questions and discussion
     url: https://github.com/tenantlayer-io/tenantlayer/discussions
     about: How do I do X, is this the right strategy, does this configuration look safe.
+  - name: How to contribute
+    url: https://github.com/tenantlayer-io/tenantlayer/blob/main/CONTRIBUTING.md
+    about: Workflow, sign-off, and what gets rejected. Read before opening a pull request.
