@@ -4,7 +4,7 @@ contact_links:
     url: https://github.com/tenantlayer-io/tenantlayer/security/advisories/new
     about: Report isolation failures privately. Do not open a public issue.
   - name: Questions and discussion
-    url: https://github.com/tenantlayer-io/tenantlayer/discussions
+    url: https://github.com/tenantlayer-io/community/discussions
     about: How do I do X, is this the right strategy, does this configuration look safe.
   - name: How to contribute
     url: https://github.com/tenantlayer-io/tenantlayer/blob/main/CONTRIBUTING.md
