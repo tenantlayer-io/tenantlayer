@@ -98,6 +98,7 @@ Documented rather than hidden, because you should design around them:
 2. **Unwrapping a pooled connection to a raw `PgConnection`.** Code that does this holds a
    connection outside the wiring from that point on. The session variable is still set, so
    policies still apply — but anything that changes the session is now your responsibility.
-3. **Caching.** A cache hit never reaches the database, so no policy can help. Until
-   tenant-scoped cache keys ship, do not put a tenant-scoped result behind `@Cacheable`
-   without keying it by tenant yourself.
+3. **Caching, if you disable it.** A cache hit never reaches the database, so no policy
+   can help. TenantLayer qualifies cache keys by tenant for exactly this reason — but
+   setting `tenantlayer.cache.enabled=false`, or naming a tenant-scoped cache under
+   `tenantlayer.cache.shared`, reopens it. See [Caching](caching.md).

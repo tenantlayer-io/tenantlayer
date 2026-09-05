@@ -141,8 +141,9 @@ tenant being requested.
 Stop and treat this as an incident.
 
 1. Are you connecting as a superuser or unforced owner? (See above — this is usually it.)
-2. Is the data coming from a **cache**? A cache hit never reaches the database, so no policy
-   can help. This is the most likely cause if the SQL looks right.
+2. Is the data coming from a **cache** that you named under `tenantlayer.cache.shared`, or
+   is `tenantlayer.cache.enabled=false`? A cache hit never reaches the database, so no
+   policy can help. This is the most likely cause if the SQL looks right.
 3. Is the query running through a connection that was unwrapped to a raw `PgConnection`?
 4. Does the table have a policy at all? A table added recently may have been missed.
 

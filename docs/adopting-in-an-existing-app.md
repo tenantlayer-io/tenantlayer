@@ -158,9 +158,10 @@ Remove them gradually and keep the tests.
 source of "worked in staging, empty in production". See
 [the tenant registry](/docs/tenant-registry) for `forEachTenant`.
 
-**Caching** is the one thing this sequence does not fix. A cache hit never reaches the
-database, so no policy can help. Audit every `@Cacheable` on a tenant-scoped result and key
-it by tenant yourself until tenant-scoped cache keys ship.
+**Caching** is handled, but check your configuration. Cache keys are qualified by tenant
+automatically; the risk in an existing application is a genuinely shared cache that you
+must name under `tenantlayer.cache.shared`, and a tenant-scoped one you must not. See
+[Caching](caching.md).
 
 **Cross-tenant admin screens** genuinely need to see everything. Today the honest answer is
 a separate connection using a role that is exempt from the policy, kept well away from

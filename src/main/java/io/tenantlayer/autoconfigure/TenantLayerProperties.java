@@ -53,6 +53,7 @@ public class TenantLayerProperties {
     private final Membership membership = new Membership();
     private final Schema schema = new Schema();
     private final Discriminator discriminator = new Discriminator();
+    private final Caching cache = new Caching();
     private final Registry registry = new Registry();
 
     public enum Source {
@@ -154,6 +155,41 @@ public class TenantLayerProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+    }
+
+    /** Features 96 and 97. */
+    public static class Caching {
+
+        /** Qualify cache keys by tenant. */
+        private boolean enabled = true;
+
+        /**
+         * Caches that are NOT tenant-scoped and should be left alone — shared reference
+         * data, feature flags, and the like.
+         *
+         * <p>Everything not named here is treated as tenant-scoped. That default is the
+         * opposite of convenient, deliberately: opting in would mean a cache someone
+         * forgot to configure leaks across tenants silently, while opting out means a
+         * forgotten one costs hit rate on shared data, which shows up in a dashboard
+         * rather than in a breach.
+         */
+        private java.util.Set<String> shared = new java.util.LinkedHashSet<>();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public java.util.Set<String> getShared() {
+            return shared;
+        }
+
+        public void setShared(java.util.Set<String> shared) {
+            this.shared = shared;
         }
     }
 
@@ -266,5 +302,9 @@ public class TenantLayerProperties {
 
     public Discriminator getDiscriminator() {
         return discriminator;
+    }
+
+    public Caching getCache() {
+        return cache;
     }
 }
