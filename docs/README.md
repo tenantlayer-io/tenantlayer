@@ -15,6 +15,9 @@ before you deploy anything.
 | [Testing](testing.md) | Fixtures, assertions, and how to tell a real isolation test from a vacuous one |
 | [Context storage](context-storage.md) | ThreadLocal today, ScopedValue later |
 | [Configuration reference](configuration.md) | Every property |
+| [Architecture](architecture.md) | How the pieces fit together, and why the obvious alternatives are wrong |
+| [Adopting in an existing app](adopting-in-an-existing-app.md) | Getting there from a running system, without a flag day |
+| [Troubleshooting](troubleshooting.md) | It returns nothing · the policy is not applying · the tenant is null |
 
 ## The one-paragraph version
 
