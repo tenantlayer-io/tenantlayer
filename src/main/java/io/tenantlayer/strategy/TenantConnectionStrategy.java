@@ -20,12 +20,13 @@ import java.sql.SQLException;
  *
  * <h2>Fail-closed is not uniform, deliberately</h2>
  *
- * Each strategy fails closed differently when no tenant is bound: row-level security
- * returns an empty result set, schema-per-tenant raises an unresolved-relation error, and
- * database-per-tenant throws before a connection exists. All three are safe — none leaks —
- * but an application that silently copes with empty results will fail loudly under the
- * others. Switching strategy is therefore <strong>not behaviour-preserving on the
- * no-tenant path</strong>, which is a property of the switch rather than a bug in it.
+ * Each strategy fails closed differently when no tenant is bound: session-scoped row-level
+ * security returns an empty result set, transaction-scoped row-level security rejects work
+ * outside a transaction, schema-per-tenant raises an unresolved-relation error, and
+ * database-per-tenant throws before a connection exists. All are safe — none leaks — but an
+ * application that silently copes with empty results will fail loudly under the others.
+ * Switching strategy is therefore <strong>not behaviour-preserving on the no-tenant or
+ * no-transaction paths</strong>, which is a property of the switch rather than a bug in it.
  *
  * <h2>Adding to this interface</h2>
  *
