@@ -11,6 +11,7 @@ import io.tenantlayer.hibernate.TenantContextIdentifierResolver;
 import io.tenantlayer.strategy.RowLevelSecurityStrategy;
 import io.tenantlayer.strategy.SchemaPerTenantStrategy;
 import io.tenantlayer.strategy.TenantConnectionStrategy;
+import io.tenantlayer.strategy.TransactionScopedRowLevelSecurityStrategy;
 import io.tenantlayer.security.ClaimTenantMembershipVerifier;
 import io.tenantlayer.security.TenantMembershipVerifier;
 import io.tenantlayer.web.HeaderTenantResolver;
@@ -105,6 +106,8 @@ public class TenantLayerAutoConfiguration {
         }
         return switch (properties.getStrategy()) {
             case ROW_LEVEL_SECURITY -> new RowLevelSecurityStrategy(dataSource);
+            case ROW_LEVEL_SECURITY_TRANSACTION_SCOPED ->
+                    new TransactionScopedRowLevelSecurityStrategy(dataSource);
             case SCHEMA_PER_TENANT ->
                     new SchemaPerTenantStrategy(dataSource, properties.getSchema().getPrefix());
         };

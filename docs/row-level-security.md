@@ -87,18 +87,41 @@ someone else's query. That is a cross-tenant read, and nothing downstream will c
 |---|---|---|
 | HikariCP or any in-process pool | — | **yes** |
 | PgBouncer | session | **yes** |
-| PgBouncer | transaction | **no** |
+| PgBouncer | transaction, session-scoped strategy | **no** |
+| PgBouncer | transaction-scoped strategy | **yes** |
 | PgBouncer | statement | **no** |
 | Supabase Supavisor, RDS Proxy, pgcat | session-equivalent | yes |
-| Supabase Supavisor, RDS Proxy, pgcat | transaction | **no** |
+| Supabase Supavisor, RDS Proxy, pgcat | transaction, session-scoped strategy | **no** |
+| Supabase Supavisor, RDS Proxy, pgcat | transaction-scoped strategy | **yes** |
 
-If you are on transaction pooling today, the options are to move that application to session
-pooling, to connect it directly to Postgres, or to use the discriminator strategy
-(`@TenantId`), which puts the predicate in the statement rather than in session state.
+If you are on transaction pooling today, configure the opt-in transaction-scoped strategy:
 
-Doing this correctly under transaction pooling means binding the tenant at **transaction
-start** rather than at connection checkout, with `SET LOCAL` inside the transaction — which
-is a different hook and is not built. It is tracked as an open issue.
+```properties
+tenantlayer.strategy=ROW_LEVEL_SECURITY_TRANSACTION_SCOPED
+```
+
+This strategy waits for JDBC transaction demarcation (`setAutoCommit(false)`), then binds the
+tenant with:
+
+```sql
+select set_config('tenantlayer.tenant', ?, true)
+```
+
+The `true` makes the setting local to that transaction. PostgreSQL removes it at both commit
+and rollback, before a PgBouncer transaction-pool connection can be assigned to the next
+client. It works with Spring's JDBC transaction managers and with code that uses the same JDBC
+transaction lifecycle directly.
+
+The strategy is deliberately fail-closed outside a transaction. Preparing or executing a
+statement while auto-commit is still enabled throws instead of running with an empty or stale
+tenant. A transaction must therefore surround every database operation on this strategy;
+health checks and other genuinely unscoped paths should use a separate, explicitly configured
+DataSource. The transaction-scoped wrapper also refuses `Connection.unwrap(...)` so callers
+cannot bypass the transaction guard.
+
+The default remains `ROW_LEVEL_SECURITY`, because it safely supports autocommit reads on an
+ordinary application-side pool. Do not select the transaction-scoped strategy unless the
+application guarantees transaction demarcation for every tenant-scoped database operation.
 
 > **Why this is not simply the default.** `SET LOCAL` requires a transaction to be local to,
 > and plenty of reads run in autocommit — a `@Transactional(readOnly = true)` that was
@@ -115,3 +138,8 @@ assertion passing for the wrong reason — including after someone deletes the p
 
 `TenantPostgres` (see [Testing](testing.md)) gives you a least-privileged connection for
 the code under test and a separate privileged one for seeding.
+
+The repository's Testcontainers fixture does not include a PgBouncer service. The strategy's
+transaction and RLS tests therefore prove the binding and isolation contract against real
+Postgres, but a real PgBouncer transaction-mode multiplexing run must still be supplied by CI
+or an environment that provides that proxy.

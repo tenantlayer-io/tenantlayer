@@ -43,6 +43,7 @@ Requires Spring Security on the classpath.
 
 | Property | Default | Meaning |
 |---|---|---|
+| `tenantlayer.strategy` | `ROW_LEVEL_SECURITY` | `ROW_LEVEL_SECURITY` publishes a session-scoped tenant on checkout; `ROW_LEVEL_SECURITY_TRANSACTION_SCOPED` binds with `SET LOCAL` at JDBC transaction start and rejects access outside a transaction; `SCHEMA_PER_TENANT` selects `search_path`. |
 | `tenantlayer.discriminator.enabled` | `true` | Register the Hibernate tenant identifier resolver that makes `@TenantId` work. |
 | `tenantlayer.kafka.enabled` | `true` | Register the Kafka producer/consumer interceptors. |
 

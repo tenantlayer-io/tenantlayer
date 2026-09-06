@@ -23,6 +23,10 @@ once and is repopulated. That is the intended behaviour, not a defect.
 
 ### Added
 
+- **Transaction-scoped RLS binding** (#29). The opt-in
+  `ROW_LEVEL_SECURITY_TRANSACTION_SCOPED` strategy uses `SET LOCAL` at JDBC transaction start
+  for PgBouncer transaction pooling. It rejects database statements outside an active
+  transaction and preserves the existing session-scoped default.
 - **Tenant-scoped cache keys** (#13). Every cache is tenant-scoped unless named under
   `tenantlayer.cache.shared`. With no tenant bound, reads miss and writes are dropped — the
   underlying method still runs, so behaviour is correct and only slower.

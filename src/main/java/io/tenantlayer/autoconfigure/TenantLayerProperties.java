@@ -43,11 +43,11 @@ public class TenantLayerProperties {
      * Feature 24 — how connections are isolated. Changing this is start-up configuration,
      * never per request.
      *
-     * <p>Note that the three strategies fail closed <em>differently</em> when no tenant is
-     * bound: row-level security yields an empty result set, schema-per-tenant raises an
-     * unresolved-relation error. All are safe, but an application that silently copes with
-     * empty results will fail loudly under the other, so switching is not
-     * behaviour-preserving on the no-tenant path.
+     * <p>Note that the strategies fail closed <em>differently</em> when no tenant is bound:
+     * session-scoped row-level security yields an empty result set, transaction-scoped
+     * row-level security rejects work outside a transaction, and schema-per-tenant raises an
+     * unresolved-relation error. All are safe, but switching is not behaviour-preserving on
+     * the no-tenant or no-transaction paths.
      */
     private Strategy strategy = Strategy.ROW_LEVEL_SECURITY;
 
@@ -71,6 +71,8 @@ public class TenantLayerProperties {
     public enum Strategy {
         /** One shared schema; Postgres row-level security enforces. The default. */
         ROW_LEVEL_SECURITY,
+        /** One shared schema; bind the RLS tenant locally at each JDBC transaction start. */
+        ROW_LEVEL_SECURITY_TRANSACTION_SCOPED,
         /** One schema per tenant on a shared pool, selected by search_path. */
         SCHEMA_PER_TENANT
     }

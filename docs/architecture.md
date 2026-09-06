@@ -4,7 +4,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/architecture-dark.png">
-  <img alt="A request enters, Spring Security optionally authenticates, TenantFilter resolves and verifies and binds the tenant, your own code runs with no knowledge of tenancy, TenantAwareDataSource publishes the tenant onto the connection on every checkout, and Postgres row-level security is the only component that enforces." src="images/architecture-light.png" width="1040">
+  <img alt="A request enters, Spring Security optionally authenticates, TenantFilter resolves and verifies and binds the tenant, your own code runs with no knowledge of tenancy, TenantAwareDataSource publishes the tenant onto the connection either on checkout or at transaction start, and Postgres row-level security is the only component that enforces." src="images/architecture-light.png" width="1040">
 </picture>
 
 The important property is that **nothing in the middle knows about tenancy**. Your
@@ -67,6 +67,17 @@ property of the SQL, not of remembering to check.
 `SET LOCAL` only survives inside an explicit transaction, and plenty of reads run in
 autocommit. Session scope with an unconditional overwrite on checkout gives the same safety
 without requiring every read to be transactional.
+
+### Transaction scope is an explicit alternative
+
+`ROW_LEVEL_SECURITY_TRANSACTION_SCOPED` is the opt-in strategy for PgBouncer transaction
+pooling and equivalent proxies. The wrapped JDBC connection binds the current tenant when
+Spring or the caller changes auto-commit from `true` to `false`, before any application
+statement is allowed. It uses `set_config(..., true)`, so commit and rollback remove the
+setting automatically. Statements prepared or executed while no transaction is active are
+rejected; they never run unscoped. This strategy is not a default because it makes every
+tenant-scoped read, including health or repository calls outside `@Transactional`, require an
+explicit transaction.
 
 ## Extension points
 
