@@ -133,6 +133,18 @@
       <optional>true</optional>
     </dependency>
 
+    <!-- Optional: feature 64, the per-tenant migration runner. -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <optional>true</optional>
+    </dependency>
+
     <!--
       io.tenantlayer.test ships to users, so it must compile against JUnit and
       Testcontainers. Both are optional, and that is load-bearing: verified against the

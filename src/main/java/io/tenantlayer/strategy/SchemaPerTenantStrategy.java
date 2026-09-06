@@ -77,8 +77,13 @@ public class SchemaPerTenantStrategy implements TenantConnectionStrategy {
         return false;
     }
 
+    @Override
+    public java.util.Optional<String> schemaFor(String tenantId) {
+        return java.util.Optional.of(schemaNameFor(tenantId));
+    }
+
     /** The schema a tenant's tables live in. */
-    public String schemaFor(String tenantId) {
+    public String schemaNameFor(String tenantId) {
         if (!SAFE_TENANT.matcher(tenantId).matches()) {
             throw new IllegalArgumentException(
                     "Tenant '" + tenantId + "' cannot be used as a schema name. Schema-per-tenant "
@@ -91,7 +96,7 @@ public class SchemaPerTenantStrategy implements TenantConnectionStrategy {
     private Connection applySearchPath(Connection connection) throws SQLException {
         String path = TenantContext.current()
                 .map(TenantScope::subject)
-                .map(this::schemaFor)
+                .map(this::schemaNameFor)
                 .orElse("");   // no tenant: nothing resolves, rather than falling back to public
 
         try (PreparedStatement statement = connection.prepareStatement(APPLY_SQL)) {

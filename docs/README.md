@@ -12,6 +12,7 @@ before you deploy anything.
 | [Securing resolution](securing-resolution.md) | Why a header alone is not enough, and how to close that |
 | [Context propagation](context-propagation.md) | @Async, CompletableFuture, virtual threads, scheduled jobs, HTTP, Kafka |
 | [The tenant registry](tenant-registry.md) | Who your tenants are, and running work for each of them |
+| [Migrations](migrations.md) | Running Flyway across tenants, and the Boot setting you must turn off first |
 | [Caching](caching.md) | The one hole row-level security cannot cover, and how it is closed |
 | [Testing](testing.md) | Fixtures, assertions, and how to tell a real isolation test from a vacuous one |
 | [Context storage](context-storage.md) | ThreadLocal today, ScopedValue later |

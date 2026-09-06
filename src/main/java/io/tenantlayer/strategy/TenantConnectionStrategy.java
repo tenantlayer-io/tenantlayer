@@ -53,4 +53,19 @@ public interface TenantConnectionStrategy {
     default boolean expectsRowLevelSecurity() {
         return true;
     }
+
+    /**
+     * The schema a tenant's tables live in, when the strategy gives each tenant its own.
+     *
+     * <p>Empty means every tenant shares one schema — which is what row-level security
+     * does — and is the reason this returns an {@link java.util.Optional} rather than a
+     * name. A migration runner needs to tell those apart: under a shared schema there is
+     * one set of tables and migrating "per tenant" would run the same migrations
+     * repeatedly against the same tables.
+     *
+     * @return the schema, or empty when tenants share one
+     */
+    default java.util.Optional<String> schemaFor(String tenantId) {
+        return java.util.Optional.empty();
+    }
 }

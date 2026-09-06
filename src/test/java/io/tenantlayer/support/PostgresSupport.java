@@ -85,6 +85,18 @@ public final class PostgresSupport {
     }
 
     /** Runs arbitrary setup SQL as the privileged user. */
+    /**
+     * A privileged pool whose connections default to the given schema. Needed to test
+     * anything that relies on the connection's default schema rather than being told one
+     * explicitly — the shared-schema migration path, for instance.
+     */
+    public static HikariDataSource privilegedPoolInSchema(String schema) {
+        start();
+        return pool("privileged-" + schema,
+                CONTAINER.getJdbcUrl() + "&currentSchema=" + schema,
+                CONTAINER.getUsername(), CONTAINER.getPassword(), 2);
+    }
+
     public static void executeAsAdmin(String sql) {
         start();
         execute(sql);

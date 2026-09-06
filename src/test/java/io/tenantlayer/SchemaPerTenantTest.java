@@ -96,10 +96,10 @@ class SchemaPerTenantTest {
         SchemaPerTenantStrategy strategy =
                 new SchemaPerTenantStrategy(PostgresSupport.applicationPool(1), "tenant_");
 
-        assertThatThrownBy(() -> strategy.schemaFor("acme; drop schema tenant_globex cascade"))
+        assertThatThrownBy(() -> strategy.schemaNameFor("acme; drop schema tenant_globex cascade"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot be used as a schema name");
-        assertThat(strategy.schemaFor("acme")).isEqualTo("tenant_acme");
+        assertThat(strategy.schemaNameFor("acme")).isEqualTo("tenant_acme");
     }
 
     @Test
