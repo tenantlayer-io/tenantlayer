@@ -144,8 +144,11 @@ Stop and treat this as an incident.
 2. Is the data coming from a **cache** that you named under `tenantlayer.cache.shared`, or
    is `tenantlayer.cache.enabled=false`? A cache hit never reaches the database, so no
    policy can help. This is the most likely cause if the SQL looks right.
-3. Is the query running through a connection that was unwrapped to a raw `PgConnection`?
-4. Does the table have a policy at all? A table added recently may have been missed.
+3. Are you behind **PgBouncer in transaction or statement pooling mode**? Session-level
+   settings are unsupported there, and the tenant can leak between clients. This is the
+   most likely cause if the application is correct and the leak looks random.
+4. Is the query running through a connection that was unwrapped to a raw `PgConnection`?
+5. Does the table have a policy at all? A table added recently may have been missed.
 
 If none of those explain it, [report it privately](https://github.com/tenantlayer-io/tenantlayer/security/advisories/new)
 — not in a public issue.

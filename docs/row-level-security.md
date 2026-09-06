@@ -68,6 +68,45 @@ create index idx_orders_tenant_id on orders (tenant_id);
 
 `RlsPolicyGenerator` emits all three. That is most of why it exists.
 
+## Connection poolers: read this if you use PgBouncer
+
+The tenant is a **session-level** setting, written with
+`set_config('tenantlayer.tenant', ?, false)` on every connection checkout. That is safe with
+an application-side pool such as HikariCP, where a connection belongs to you until you
+return it.
+
+It is **not safe with PgBouncer in transaction or statement pooling mode.**
+
+In those modes a server connection is assigned to you only for the duration of one
+transaction. Session state — `SET`, prepared statements, temporary tables — is explicitly
+unsupported, because the connection you set the tenant on can be handed to a different
+client for the next transaction. The setting can outlive your use of it and be visible to
+someone else's query. That is a cross-tenant read, and nothing downstream will catch it.
+
+| Pooler | Mode | Safe |
+|---|---|---|
+| HikariCP or any in-process pool | — | **yes** |
+| PgBouncer | session | **yes** |
+| PgBouncer | transaction | **no** |
+| PgBouncer | statement | **no** |
+| Supabase Supavisor, RDS Proxy, pgcat | session-equivalent | yes |
+| Supabase Supavisor, RDS Proxy, pgcat | transaction | **no** |
+
+If you are on transaction pooling today, the options are to move that application to session
+pooling, to connect it directly to Postgres, or to use the discriminator strategy
+(`@TenantId`), which puts the predicate in the statement rather than in session state.
+
+Doing this correctly under transaction pooling means binding the tenant at **transaction
+start** rather than at connection checkout, with `SET LOCAL` inside the transaction — which
+is a different hook and is not built. It is tracked as an open issue.
+
+> **Why this is not simply the default.** `SET LOCAL` requires a transaction to be local to,
+> and plenty of reads run in autocommit — a `@Transactional(readOnly = true)` that was
+> optimised away, a repository call outside a transaction, a health check. Making isolation
+> depend on every read path being transactional is a rule someone eventually breaks, and the
+> failure is silent. Session scope on checkout has no such precondition. Transaction-scoped
+> binding will be an opt-in strategy for the people who need it, not a replacement.
+
 ## Testing against a superuser makes every test meaningless
 
 A Testcontainers Postgres hands you a superuser. Superusers bypass RLS outright, so a suite
