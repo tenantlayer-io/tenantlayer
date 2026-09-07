@@ -12,6 +12,12 @@ Every property, with its default.
 | `tenantlayer.path-prefix` | `/t` | Prefix the path resolver matches, e.g. `/t/acme/orders`. |
 | `tenantlayer.jwt-claim` | `tenant_id` | Token claim the JWT resolver reads. |
 | `tenantlayer.strict` | `true` | Reject requests with no resolvable tenant. Leave it on. |
+| `tenantlayer.strategy` | `ROW_LEVEL_SECURITY` | Isolation strategy: `ROW_LEVEL_SECURITY`, `SCHEMA_PER_TENANT` or `DATABASE_PER_TENANT`. Chosen once at start-up, never per request. |
+| `tenantlayer.databases.<ref>.url` | *(unset)* | JDBC URL for one tenant database under `DATABASE_PER_TENANT`. `<ref>` is the tenant's `datasource_ref`, or its id when it has none. |
+| `tenantlayer.databases.<ref>.username` | *(unset)* | Username for that database. Omit when the URL carries it. |
+| `tenantlayer.databases.<ref>.password` | *(unset)* | Password for that database. |
+| `tenantlayer.databases.<ref>.max-pool-size` | *(pool default)* | Per-tenant pool ceiling. |
+| `tenantlayer.databases-max-pools` | `50` | How many tenant pools may be open at once. Exceeding it throws rather than evicting a live pool. |
 | `tenantlayer.unscoped-paths` | `/actuator`, `/error` | Path prefixes served without a tenant. |
 | `tenantlayer.filter-order` | *(derived)* | Servlet filter order. Derived: near-first normally, after Spring Security when resolution or membership needs an authenticated principal. |
 

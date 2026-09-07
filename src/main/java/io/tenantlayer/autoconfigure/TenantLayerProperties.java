@@ -68,11 +68,79 @@ public class TenantLayerProperties {
     private final Caching cache = new Caching();
     private final Registry registry = new Registry();
 
+    /**
+     * Databases for DATABASE_PER_TENANT, keyed by the tenant's datasource reference — or by
+     * tenant id when the tenant has no reference in the registry.
+     */
+    private java.util.Map<String, Database> databases = new java.util.LinkedHashMap<>();
+
+    /** Ceiling on how many tenant pools may be open at once. */
+    private int databasesMaxPools =
+            io.tenantlayer.strategy.ConfiguredTenantDataSourceProvider.DEFAULT_MAX_POOLS;
+
+    public java.util.Map<String, Database> getDatabases() {
+        return databases;
+    }
+
+    public void setDatabases(java.util.Map<String, Database> databases) {
+        this.databases = databases == null ? new java.util.LinkedHashMap<>() : databases;
+    }
+
+    public int getDatabasesMaxPools() {
+        return databasesMaxPools;
+    }
+
+    public void setDatabasesMaxPools(int databasesMaxPools) {
+        this.databasesMaxPools = databasesMaxPools;
+    }
+
+    /** One tenant database. */
+    public static class Database {
+        private String url;
+        private String username;
+        private String password;
+        private Integer maxPoolSize;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public Integer getMaxPoolSize() {
+            return maxPoolSize;
+        }
+
+        public void setMaxPoolSize(Integer maxPoolSize) {
+            this.maxPoolSize = maxPoolSize;
+        }
+    }
+
     public enum Strategy {
         /** One shared schema; Postgres row-level security enforces. The default. */
         ROW_LEVEL_SECURITY,
         /** One schema per tenant on a shared pool, selected by search_path. */
-        SCHEMA_PER_TENANT
+        SCHEMA_PER_TENANT,
+        /** One database per tenant, each behind its own pool. */
+        DATABASE_PER_TENANT
     }
 
     public enum Source {

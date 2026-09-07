@@ -68,4 +68,34 @@ public interface TenantConnectionStrategy {
     default java.util.Optional<String> schemaFor(String tenantId) {
         return java.util.Optional.empty();
     }
+
+    /**
+     * Whether schema changes have to be applied once per tenant rather than once in total.
+     *
+     * <p>This cannot be inferred from {@link #schemaFor}, which is why it is here. Under
+     * database-per-tenant every tenant has its own physical database and so needs its own
+     * migration run, yet {@code schemaFor} is empty because those databases all use the
+     * same schema <em>name</em>. Deciding from the schema alone would migrate one database
+     * and leave every other tenant on an old version, silently.
+     *
+     * <p>The default preserves the older behaviour exactly: per-tenant when each tenant has
+     * a schema of its own, once otherwise.
+     */
+    default boolean migratesPerTenant() {
+        return schemaFor("probe").isPresent();
+    }
+
+    /**
+     * The datasource a tenant's data actually lives in, when the strategy gives each tenant
+     * a different one.
+     *
+     * <p>Empty means every tenant shares the application's datasource, which is true of both
+     * row-level security and schema-per-tenant. A migration runner needs this because it
+     * cannot reach a tenant's database by varying a schema when the database itself differs.
+     *
+     * @return the tenant's datasource, or empty when tenants share one
+     */
+    default java.util.Optional<javax.sql.DataSource> dataSourceFor(String tenantId) {
+        return java.util.Optional.empty();
+    }
 }

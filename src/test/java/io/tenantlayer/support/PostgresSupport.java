@@ -97,6 +97,45 @@ public final class PostgresSupport {
                 CONTAINER.getUsername(), CONTAINER.getPassword(), 2);
     }
 
+    /**
+     * Creates another database in the same container. Database-per-tenant cannot be tested
+     * with schemas — the whole claim is that tenants are in different databases — so the
+     * fixture has to make real ones.
+     */
+    public static void createDatabase(String name) {
+        start();
+        // CREATE DATABASE cannot run inside a transaction block, hence its own connection
+        // with autocommit left on.
+        try (var connection = privileged.getConnection();
+                var statement = connection.createStatement()) {
+            statement.execute("drop database if exists " + name);
+            statement.execute("create database " + name);
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("could not create database " + name, e);
+        }
+    }
+
+    /** A pool pointed at another database in the same container. */
+    public static HikariDataSource privilegedPoolInDatabase(String database) {
+        start();
+        return pool("privileged-db-" + database, urlForDatabase(database),
+                CONTAINER.getUsername(), CONTAINER.getPassword(), 2);
+    }
+
+    public static String urlForDatabase(String database) {
+        start();
+        return CONTAINER.getJdbcUrl().replaceFirst(
+                "/" + CONTAINER.getDatabaseName() + "\\b", "/" + database);
+    }
+
+    public static String adminUser() {
+        return CONTAINER.getUsername();
+    }
+
+    public static String adminPassword() {
+        return CONTAINER.getPassword();
+    }
+
     public static void executeAsAdmin(String sql) {
         start();
         execute(sql);

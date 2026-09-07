@@ -4,6 +4,31 @@ Notable changes per release. This project follows [semantic versioning](https://
 with the usual 0.x caveat: breaking changes may land in any 0.x release, and will always be
 listed here.
 
+## Unreleased
+
+### Database-per-tenant
+
+`tenantlayer.strategy=DATABASE_PER_TENANT` gives every tenant its own database behind its
+own pool, completing the three canonical strategies. Databases are declared under
+`tenantlayer.databases.<ref>`, keyed by the tenant's `datasource_ref` so tenants can share a
+shard; pools open on first use and are capped by `tenantlayer.databases-max-pools`.
+Publishing a `TenantDataSourceProvider` bean replaces the configuration entirely, for
+deployments whose connection details come from a secrets manager.
+
+An unrecognised tenant, or none, throws before a connection exists — there is deliberately
+no fall back to the application's datasource.
+
+### Fixed: migrations under a per-database strategy
+
+`TenantMigrationRunner` decided between migrating once and migrating per tenant by asking
+whether the strategy gave each tenant its own *schema*. Database-per-tenant gives each
+tenant its own *database* while sharing a schema name, so that test would have migrated one
+database and silently left every other tenant on an old version. The runner now asks
+`TenantConnectionStrategy.migratesPerTenant()` and runs against each tenant's own datasource.
+
+Two `default` methods were added to `TenantConnectionStrategy` — `migratesPerTenant()` and
+`dataSourceFor(String)`. Existing implementations keep compiling and behave exactly as before.
+
 ## 0.2.0 — 2026-09-06
 
 ### If you use `@Cacheable` on tenant-scoped data, read this first

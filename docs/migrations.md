@@ -97,3 +97,14 @@ or number your first real migration V2.
 Keep tenant migrations **out of `classpath:db/migration`** — that is Boot's default
 location, and anything there is picked up by the automatic single-schema migration you
 turned off above, should it ever be turned back on.
+
+## Database-per-tenant
+
+Each tenant has its own database, so migrations run once per tenant against that tenant's
+own datasource rather than once against a shared one. The runner asks the strategy
+(`migratesPerTenant()`) rather than inferring it from the schema — under
+`DATABASE_PER_TENANT` every tenant uses the same schema *name*, so deciding from the schema
+alone would migrate one database and silently leave every other tenant on an old version.
+
+A tenant with no configured database is not skipped quietly: it fails, and the failure names
+the tenant.

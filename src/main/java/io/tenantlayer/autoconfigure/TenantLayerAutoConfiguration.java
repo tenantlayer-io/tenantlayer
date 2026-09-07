@@ -10,7 +10,12 @@ import io.tenantlayer.core.TenantTaskDecorator;
 import io.tenantlayer.hibernate.TenantContextIdentifierResolver;
 import io.tenantlayer.strategy.RowLevelSecurityStrategy;
 import io.tenantlayer.strategy.SchemaPerTenantStrategy;
+import io.tenantlayer.registry.TenantRegistry;
+import io.tenantlayer.strategy.ConfiguredTenantDataSourceProvider;
+import io.tenantlayer.strategy.DatabasePerTenantStrategy;
 import io.tenantlayer.strategy.TenantConnectionStrategy;
+import io.tenantlayer.strategy.TenantDataSourceProvider;
+import io.tenantlayer.strategy.TenantDatabase;
 import io.tenantlayer.security.ClaimTenantMembershipVerifier;
 import io.tenantlayer.security.TenantMembershipVerifier;
 import io.tenantlayer.web.HeaderTenantResolver;
@@ -20,7 +25,9 @@ import io.tenantlayer.web.SubdomainTenantResolver;
 import io.tenantlayer.web.TenantFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
@@ -76,7 +83,9 @@ public class TenantLayerAutoConfiguration {
      */
     @Bean
     static BeanPostProcessor tenantLayerDataSourcePostProcessor(
-            ObjectProvider<TenantLayerProperties> properties) {
+            ObjectProvider<TenantLayerProperties> properties,
+            ObjectProvider<TenantDataSourceProvider> dataSourceProvider,
+            ObjectProvider<TenantRegistry> registry) {
 
         return new BeanPostProcessor() {
             @Override
@@ -85,7 +94,9 @@ public class TenantLayerAutoConfiguration {
                 if (bean instanceof DataSource dataSource
                         && !(bean instanceof TenantAwareDataSource)) {
                     TenantLayerProperties props = properties.getIfAvailable();
-                    return new TenantAwareDataSource(dataSource, strategyFor(props, dataSource));
+                    return new TenantAwareDataSource(
+                            dataSource,
+                            strategyFor(props, dataSource, dataSourceProvider, registry));
                 }
                 return bean;
             }
@@ -98,7 +109,10 @@ public class TenantLayerAutoConfiguration {
      * read another tenant's data by changing one property.
      */
     private static TenantConnectionStrategy strategyFor(
-            TenantLayerProperties properties, DataSource dataSource) {
+            TenantLayerProperties properties,
+            DataSource dataSource,
+            ObjectProvider<TenantDataSourceProvider> dataSourceProvider,
+            ObjectProvider<TenantRegistry> registry) {
 
         if (properties == null) {
             return new RowLevelSecurityStrategy(dataSource);
@@ -107,7 +121,41 @@ public class TenantLayerAutoConfiguration {
             case ROW_LEVEL_SECURITY -> new RowLevelSecurityStrategy(dataSource);
             case SCHEMA_PER_TENANT ->
                     new SchemaPerTenantStrategy(dataSource, properties.getSchema().getPrefix());
+            case DATABASE_PER_TENANT ->
+                    new DatabasePerTenantStrategy(
+                            providerFor(properties, dataSourceProvider, registry));
         };
+    }
+
+    /**
+     * A user-supplied provider wins; otherwise the databases in configuration are used.
+     *
+     * <p>Both the provider bean and the registry are resolved lazily. This runs while
+     * datasources are still being wrapped, and the registry reads from one — asking for
+     * either eagerly would close that into a circular dependency.
+     */
+    private static TenantDataSourceProvider providerFor(
+            TenantLayerProperties properties,
+            ObjectProvider<TenantDataSourceProvider> dataSourceProvider,
+            ObjectProvider<TenantRegistry> registry) {
+
+        TenantDataSourceProvider supplied = dataSourceProvider.getIfAvailable();
+        if (supplied != null) {
+            return supplied;
+        }
+
+        Map<String, TenantDatabase> databases = new LinkedHashMap<>();
+        properties.getDatabases().forEach((ref, db) -> databases.put(
+                ref,
+                new TenantDatabase(db.getUrl(), db.getUsername(), db.getPassword(), db.getMaxPoolSize())));
+
+        if (databases.isEmpty()) {
+            org.slf4j.LoggerFactory.getLogger(TenantLayerAutoConfiguration.class).warn(
+                    "strategy is DATABASE_PER_TENANT but no databases are configured under "
+                            + "tenantlayer.databases; every request will fail until one is");
+        }
+        return new ConfiguredTenantDataSourceProvider(
+                databases, registry::getIfAvailable, properties.getDatabasesMaxPools());
     }
 
     /** Carries the tenant into @Async and other Spring-managed executors. */

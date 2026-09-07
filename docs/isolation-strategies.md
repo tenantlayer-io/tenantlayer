@@ -54,5 +54,78 @@ concern (Tenant Guard); the second is why your application must not connect as o
 
 ## Schema-per-tenant and database-per-tenant
 
-v0.2 and v0.3 respectively. The registry already carries `datasource_ref` so that adopting
-them later is a routing change rather than a migration.
+Both are selected by configuration and need no application change:
+
+```properties
+tenantlayer.strategy=SCHEMA_PER_TENANT     # one schema per tenant, one pool
+tenantlayer.strategy=DATABASE_PER_TENANT   # one database per tenant, a pool each
+```
+
+### Database-per-tenant
+
+The pool *is* the isolation. A connection handed to acme is physically attached to acme's
+database, so there is no policy to get wrong and no session variable to leak across a
+pooled checkout. Declare the databases:
+
+```properties
+tenantlayer.strategy=DATABASE_PER_TENANT
+
+tenantlayer.databases.acme.url=jdbc:postgresql://db-1:5432/acme
+tenantlayer.databases.acme.username=acme_app
+tenantlayer.databases.acme.password=${ACME_DB_PASSWORD}
+
+tenantlayer.databases.shard-a.url=jdbc:postgresql://db-2:5432/shard_a
+tenantlayer.databases.shard-a.username=app
+tenantlayer.databases.shard-a.password=${SHARD_A_PASSWORD}
+
+tenantlayer.databases-max-pools=50
+```
+
+Keys are **database references**, not tenant ids. A tenant is mapped to one through
+`datasource_ref` in the [registry](tenant-registry.md), which is how a hundred small
+tenants share a shard while a large one gets a database to itself. A tenant with no
+`datasource_ref` uses its own id as the reference — the plain one-database-per-tenant case,
+with nothing extra to configure.
+
+Pools open on first use, never speculatively. Once `databases-max-pools` is reached the
+next new database throws rather than evicting: an idle pool cannot be closed safely without
+knowing whether a connection from it is still in flight, and silently recycling pools turns
+a capacity problem into intermittent failures under load.
+
+**It fails closed, loudly.** No tenant bound, or a tenant with no configured database, and
+you get an exception before a connection exists — never a fall back to the application's
+main datasource. That datasource is somebody's database, and serving it to an unrecognised
+tenant is the exact cross-tenant read this strategy exists to prevent.
+
+This is louder than the other two on the no-tenant path. Row-level security returns an empty
+result set, schema-per-tenant raises an unresolved relation, and this throws. All three are
+safe; only this one is impossible to ignore — so an application that quietly copes with
+empty results will start failing when you switch to it. That is a property of the switch,
+not a bug in it.
+
+### Supplying databases from somewhere else
+
+Connection details often live in a secrets manager that issues short-lived credentials
+rather than in a properties file. Publish a `TenantDataSourceProvider` bean and it is used
+instead of the configuration above:
+
+```java
+@Bean
+TenantDataSourceProvider tenantDataSourceProvider(VaultClient vault) {
+    return tenantId -> vault.lease(tenantId).map(this::poolFor);
+}
+```
+
+Return empty for a tenant you do not recognise. Do not substitute a default — that is the
+one thing the strategy cannot check for you.
+
+### Migrations
+
+Each tenant has its own database, so schema changes must reach every one of them.
+`TenantMigrationRunner` handles this: it asks the strategy whether migrations are per-tenant
+and, under this strategy, runs Flyway once per tenant against that tenant's own datasource.
+See [migrations](migrations.md).
+
+Note that `schemaFor` is empty here — tenants share a schema *name* and merely live in
+different databases — which is why the runner asks `migratesPerTenant()` instead of
+inferring it from the schema.

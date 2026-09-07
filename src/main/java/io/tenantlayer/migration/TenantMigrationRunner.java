@@ -82,12 +82,12 @@ public class TenantMigrationRunner {
     public MigrationOutcome migrateAll() {
         List<String> tenants = registry.activeTenantIds();
 
-        if (strategy.schemaFor("probe").isEmpty()) {
-            // One shared schema. Running per tenant would replay the same migrations
+        if (!strategy.migratesPerTenant()) {
+            // One shared store. Running per tenant would replay the same migrations
             // against the same tables, which Flyway would refuse — correctly.
-            log.info("strategy '{}' shares one schema; migrating once for {} tenants",
+            log.info("strategy '{}' shares one store; migrating once for {} tenants",
                     strategy.name(), tenants.size());
-            return runOne("(shared)", null, tenants.size());
+            return runOne("(shared)", null, dataSource, tenants.size());
         }
 
         Map<String, Integer> migrated = new LinkedHashMap<>();
@@ -95,7 +95,11 @@ public class TenantMigrationRunner {
 
         for (String tenant : tenants) {
             try {
-                MigrationOutcome one = runOne(tenant, strategy.schemaFor(tenant).orElseThrow(), 1);
+                MigrationOutcome one = runOne(
+                        tenant,
+                        strategy.schemaFor(tenant).orElse(null),
+                        strategy.dataSourceFor(tenant).orElse(dataSource),
+                        1);
                 migrated.putAll(one.migrated());
             } catch (TenantMigrationException e) {
                 failures.putAll(e.outcome().failures());
@@ -114,17 +118,26 @@ public class TenantMigrationRunner {
 
     /** Migrates one tenant. */
     public MigrationOutcome migrate(String tenantId) {
-        String schema = strategy.schemaFor(tenantId).orElse(null);
-        return runOne(tenantId, schema, 1);
+        return runOne(
+                tenantId,
+                strategy.schemaFor(tenantId).orElse(null),
+                strategy.dataSourceFor(tenantId).orElse(dataSource),
+                1);
     }
 
-    private MigrationOutcome runOne(String label, String schema, int attempted) {
+    /**
+     * A strategy can vary either the schema or the datasource a tenant's tables live in.
+     * Schema-per-tenant varies the first, database-per-tenant the second, and neither can
+     * be reached by only knowing the other — which is why both are parameters here.
+     */
+    private MigrationOutcome runOne(
+            String label, String schema, DataSource target, int attempted) {
         Map<String, Integer> migrated = new LinkedHashMap<>();
         Map<String, Throwable> failures = new LinkedHashMap<>();
 
         try {
             var configuration = Flyway.configure()
-                    .dataSource(dataSource)
+                    .dataSource(target)
                     .locations(locations.toArray(String[]::new))
                     .baselineOnMigrate(baselineOnMigrate);
 
