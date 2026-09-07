@@ -81,6 +81,17 @@ tenantlayer.databases.shard-a.password=${SHARD_A_PASSWORD}
 tenantlayer.databases-max-pools=50
 ```
 
+**You must declare the Hibernate dialect.** Hibernate works out which dialect to use at
+start-up by asking a connection for its metadata — and at start-up no tenant is bound, so
+under this strategy there is no database to ask. Without this the application does not
+start, and the error names the dialect rather than the tenancy:
+
+```properties
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+```
+
+> `Unable to determine Dialect without JDBC metadata` on start-up means exactly this.
+
 Keys are **database references**, not tenant ids. A tenant is mapped to one through
 `datasource_ref` in the [registry](tenant-registry.md), which is how a hundred small
 tenants share a shard while a large one gets a database to itself. A tenant with no

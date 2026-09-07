@@ -70,12 +70,7 @@ public class TenantMigrationRunner {
      * name explicitly.
      */
     private static DataSource unwrap(DataSource dataSource) {
-        DataSource current = dataSource;
-        while (current instanceof DelegatingDataSource delegating
-                && delegating.getTargetDataSource() != null) {
-            current = delegating.getTargetDataSource();
-        }
-        return current;
+        return io.tenantlayer.core.TenantAwareDataSource.unwrap(dataSource);
     }
 
     /** Migrates every active tenant, or the shared schema once. */

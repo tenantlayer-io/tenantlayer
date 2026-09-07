@@ -34,6 +34,24 @@ public class TenantAwareDataSource extends DelegatingDataSource {
     private final TenantConnectionStrategy strategy;
 
     /** Row-level security on the given pool — what 0.1.0 did. */
+    /**
+     * The datasource underneath any tenant-aware wrapping.
+     *
+     * <p>Some work is cross-tenant by nature and must not be routed by the acting tenant:
+     * the tenant registry is read to find out who the tenants <em>are</em>, before any is
+     * known, and a migration runner names its own schema explicitly. Under row-level
+     * security going through the wrapper is merely pointless; under database-per-tenant
+     * there is no connection to hand out at all, so it throws.
+     */
+    public static DataSource unwrap(DataSource dataSource) {
+        DataSource current = dataSource;
+        while (current instanceof org.springframework.jdbc.datasource.DelegatingDataSource delegating
+                && delegating.getTargetDataSource() != null) {
+            current = delegating.getTargetDataSource();
+        }
+        return current;
+    }
+
     public TenantAwareDataSource(DataSource delegate) {
         this(delegate, new RowLevelSecurityStrategy(delegate));
     }

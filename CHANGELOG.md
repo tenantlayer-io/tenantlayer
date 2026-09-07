@@ -18,6 +18,11 @@ deployments whose connection details come from a secrets manager.
 An unrecognised tenant, or none, throws before a connection exists — there is deliberately
 no fall back to the application's datasource.
 
+**This strategy requires `spring.jpa.database-platform` to be set.** Hibernate determines
+its dialect at start-up by asking a connection for metadata, and at start-up no tenant is
+bound, so there is no database to ask. Without it the application fails to start with an
+error about dialects that says nothing about tenancy.
+
 ### Fixed: migrations under a per-database strategy
 
 `TenantMigrationRunner` decided between migrating once and migrating per tenant by asking

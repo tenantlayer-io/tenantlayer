@@ -1,5 +1,6 @@
 package io.tenantlayer.autoconfigure;
 
+import io.tenantlayer.core.TenantAwareDataSource;
 import io.tenantlayer.registry.JdbcTenantRegistry;
 import io.tenantlayer.registry.TenantRegistry;
 import javax.sql.DataSource;
@@ -31,6 +32,12 @@ public class TenantRegistryAutoConfiguration {
     @ConditionalOnBean(DataSource.class)
     @ConditionalOnMissingBean
     TenantRegistry tenantRegistry(DataSource dataSource, TenantLayerProperties properties) {
-        return new JdbcTenantRegistry(dataSource, properties.getRegistry().getTable());
+        /* Deliberately the unwrapped datasource. The registry answers "who are the
+           tenants?", which is asked before any tenant is bound — routing that question by
+           the acting tenant is a contradiction. It happens to work through the wrapper
+           under row-level security, and throws under database-per-tenant, which is the
+           same bug either way. */
+        return new JdbcTenantRegistry(
+                TenantAwareDataSource.unwrap(dataSource), properties.getRegistry().getTable());
     }
 }

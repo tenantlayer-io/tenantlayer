@@ -182,3 +182,19 @@ Ask in [Discussions](https://github.com/tenantlayer-io/community/discussions) wi
 `tenantlayer.*` configuration, the role your application connects as, and the output of
 `select current_user, usesuper from pg_user where usename = current_user`. Those three
 answer most questions immediately.
+
+## `Unable to determine Dialect without JDBC metadata` at start-up
+
+You are on `tenantlayer.strategy=DATABASE_PER_TENANT`. Hibernate decides its dialect by
+asking a connection for metadata while the context is building, and at that moment no tenant
+is bound — so the strategy has no database to give it and refuses, correctly, rather than
+picking one.
+
+Declare the dialect so the probe is skipped:
+
+```properties
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+```
+
+The error mentions dialects and not tenancy, which is why it is worth knowing about before
+you meet it.
