@@ -2,6 +2,8 @@
 
 **The tenant isolation layer for Spring Boot + Postgres.**
 
+[![TenantLayer on StartupScores](https://startupscores.com/badge/tenantlayer.svg?style=shield&v=combo&theme=dark)](https://startupscores.com/open-source/tenantlayer)
+
 Your query has no `WHERE tenant_id`. It returns only your tenant's rows anyway.
 
 ```java
