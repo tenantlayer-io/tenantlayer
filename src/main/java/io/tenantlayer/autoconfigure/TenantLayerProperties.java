@@ -67,6 +67,25 @@ public class TenantLayerProperties {
     private final Discriminator discriminator = new Discriminator();
     private final Caching cache = new Caching();
     private final Registry registry = new Registry();
+    private final Check check = new Check();
+
+    public Check getCheck() {
+        return check;
+    }
+
+    /** The start-up isolation check. */
+    public static class Check {
+        /** Compare the entities against the database's policies at start-up, and warn. */
+        private boolean enabled = true;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
 
     /**
      * Databases for DATABASE_PER_TENANT, keyed by the tenant's datasource reference — or by
