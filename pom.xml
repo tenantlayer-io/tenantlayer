@@ -146,6 +146,13 @@
       <artifactId>spring-boot-actuator-autoconfigure</artifactId>
       <optional>true</optional>
     </dependency>
+    <!-- Metric tagging. Optional on purpose: it arrives transitively with spring-kafka
+         or actuator, and neither of those is guaranteed on a consumer's classpath. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-observation</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>

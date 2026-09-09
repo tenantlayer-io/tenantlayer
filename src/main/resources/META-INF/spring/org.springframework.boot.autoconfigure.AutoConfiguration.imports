@@ -4,3 +4,4 @@ io.tenantlayer.autoconfigure.TenantSchemaAutoConfiguration
 io.tenantlayer.autoconfigure.TenantKafkaAutoConfiguration
 io.tenantlayer.autoconfigure.TenantCacheAutoConfiguration
 io.tenantlayer.autoconfigure.TenantEndpointAutoConfiguration
+io.tenantlayer.autoconfigure.TenantMetricsAutoConfiguration

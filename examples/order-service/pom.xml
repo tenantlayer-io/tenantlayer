@@ -33,8 +33,8 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
-    <!-- The tenants endpoint is an actuator endpoint; without this there is nothing to
-         expose it on. -->
+    <!-- Brings the ObservationRegistry, without which nothing records observations and
+         the tenant tag has nowhere to appear, and hosts the tenants endpoint. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>

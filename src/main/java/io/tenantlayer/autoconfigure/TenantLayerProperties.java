@@ -68,6 +68,7 @@ public class TenantLayerProperties {
     private final Caching cache = new Caching();
     private final Registry registry = new Registry();
     private final Check check = new Check();
+    private final Metrics metrics = new Metrics();
 
     public Check getCheck() {
         return check;
@@ -84,6 +85,46 @@ public class TenantLayerProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+    }
+
+    public Metrics getMetrics() {
+        return metrics;
+    }
+
+    /** The tenant tag on metrics, and the cap that keeps it affordable. */
+    public static class Metrics {
+        /** Tag observations with the acting tenant. */
+        private boolean enabled = true;
+
+        /** How many tenants get a time series of their own before the rest share one. */
+        private int maxTenants = io.tenantlayer.metrics.TenantTagLimiter.DEFAULT_MAX_TENANTS;
+
+        /** What tenants beyond the cap are reported as. */
+        private String overflowValue = io.tenantlayer.metrics.TenantTagLimiter.DEFAULT_OVERFLOW;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getMaxTenants() {
+            return maxTenants;
+        }
+
+        public void setMaxTenants(int maxTenants) {
+            this.maxTenants = maxTenants;
+        }
+
+        public String getOverflowValue() {
+            return overflowValue;
+        }
+
+        public void setOverflowValue(String overflowValue) {
+            this.overflowValue = overflowValue;
         }
     }
 
