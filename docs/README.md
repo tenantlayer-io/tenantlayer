@@ -70,6 +70,7 @@ of it.
 | [Outbound HTTP](http-clients.md) | RestClient, RestTemplate, WebClient and Feign — and the builder mistake that silently drops the header |
 | [Kafka](kafka.md) | Produce, consume, batch listeners, and the retained tenant that causes cross-tenant writes |
 | [Onboarding a tenant](onboarding.md) | Provisioning a new tenant at runtime, hooks, and what happens when one fails |
+| [Tenant endpoints](tenant-endpoints.md) | Driving the registry over HTTP, and the two properties that turn it on |
 | [The tenant registry](tenant-registry.md) | Who your tenants are, and running work for each of them |
 | [Migrations](migrations.md) | Running Flyway across tenants, and the Boot setting you must turn off first |
 | [Caching](caching.md) | The one hole row-level security cannot cover, and how it is closed |

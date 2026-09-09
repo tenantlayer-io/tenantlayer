@@ -49,6 +49,12 @@
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
+    <!-- Actuator resolves write-operation parameters by name at runtime. This project
+         imports the Spring Boot BOM rather than using the parent POM, so it does not
+         inherit -parameters and an exposed endpoint would fail application start-up with
+         "Failed to extract parameter names". Found by order-service, not by the library's
+         own tests, which call the endpoint object directly and never go through actuator. -->
+    <maven.compiler.parameters>true</maven.compiler.parameters>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <spring-boot.version>3.5.3</spring-boot.version>
     <surefire.version>3.2.5</surefire.version>
@@ -134,6 +140,12 @@
     </dependency>
 
     <!-- Optional: feature 64, the per-tenant migration runner. -->
+    <!-- The tenant endpoint. Optional: a service without actuator simply does not get it. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-actuator-autoconfigure</artifactId>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>
