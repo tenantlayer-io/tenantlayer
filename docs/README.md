@@ -72,6 +72,7 @@ of it.
 | [The tenant registry](tenant-registry.md) | Who your tenants are, and running work for each of them |
 | [Migrations](migrations.md) | Running Flyway across tenants, and the Boot setting you must turn off first |
 | [Caching](caching.md) | The one hole row-level security cannot cover, and how it is closed |
+| [The isolation checker](isolation-checker.md) | The start-up scan that tells you which tables are not actually protected |
 | [Metrics](metrics.md) | The tenant tag on observations, and the cardinality cap that keeps it affordable |
 | [Testing](testing.md) | Fixtures, assertions, and how to tell a real isolation test from a vacuous one |
 | [Context storage](context-storage.md) | ThreadLocal today, ScopedValue later |

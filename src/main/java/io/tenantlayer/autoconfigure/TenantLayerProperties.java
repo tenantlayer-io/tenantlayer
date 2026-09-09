@@ -67,7 +67,26 @@ public class TenantLayerProperties {
     private final Discriminator discriminator = new Discriminator();
     private final Caching cache = new Caching();
     private final Registry registry = new Registry();
+    private final Check check = new Check();
     private final Metrics metrics = new Metrics();
+
+    public Check getCheck() {
+        return check;
+    }
+
+    /** The start-up isolation check. */
+    public static class Check {
+        /** Compare the entities against the database's policies at start-up, and warn. */
+        private boolean enabled = true;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
 
     public Metrics getMetrics() {
         return metrics;
