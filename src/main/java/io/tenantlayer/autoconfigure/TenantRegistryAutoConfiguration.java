@@ -1,7 +1,10 @@
 package io.tenantlayer.autoconfigure;
 
 import io.tenantlayer.core.TenantAwareDataSource;
+import io.tenantlayer.migration.TenantMigrationRunner;
 import io.tenantlayer.registry.JdbcTenantRegistry;
+import io.tenantlayer.registry.TenantProvisioning;
+import io.tenantlayer.registry.TenantProvisioningHook;
 import io.tenantlayer.registry.TenantRegistry;
 import javax.sql.DataSource;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -11,6 +14,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -39,5 +44,24 @@ public class TenantRegistryAutoConfiguration {
            same bug either way. */
         return new JdbcTenantRegistry(
                 TenantAwareDataSource.unwrap(dataSource), properties.getRegistry().getTable());
+    }
+
+    /**
+     * Feature 67 — onboarding, for whichever service owns signing up.
+     *
+     * <p>The migration runner is optional: it only exists when Flyway is on the classpath,
+     * and under a shared store there is nothing per-tenant to migrate anyway. Hooks are
+     * whatever the application defines, in {@code order()}.
+     */
+    @Bean
+    @ConditionalOnBean(TenantRegistry.class)
+    @ConditionalOnMissingBean
+    TenantProvisioning tenantProvisioning(
+            TenantRegistry registry,
+            ObjectProvider<TenantMigrationRunner> migrations,
+            ObjectProvider<TenantProvisioningHook> hooks) {
+
+        return new TenantProvisioning(
+                registry, migrations.getIfAvailable(), hooks.orderedStream().toList());
     }
 }

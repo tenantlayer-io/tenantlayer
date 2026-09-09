@@ -161,4 +161,15 @@ public class TenantMigrationRunner {
     public Optional<String> schemaFor(String tenantId) {
         return strategy.schemaFor(tenantId);
     }
+
+    /**
+     * Whether each tenant needs its own migration run.
+     *
+     * <p>Exposed so a caller can skip {@link #migrate(String)} entirely under a shared
+     * store, where it would start Flyway, find every migration already applied, and return
+     * having done nothing. Harmless, and a round trip on every signup.
+     */
+    public boolean migratesPerTenant() {
+        return strategy.migratesPerTenant();
+    }
 }
