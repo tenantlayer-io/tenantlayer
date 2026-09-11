@@ -59,6 +59,10 @@ class PgBouncerTransactionPoolingTest {
                     .withEnv("DB_NAME", DATABASE)
                     .withEnv("DB_USER", APP_USER)
                     .withEnv("DB_PASSWORD", APP_PASSWORD)
+                    // PostgreSQL 16 stores this test role with a SCRAM verifier. The image
+                    // defaults to md5 and generates an incompatible MD5 userlist entry; plain
+                    // lets PgBouncer forward the password so PostgreSQL performs SCRAM.
+                    .withEnv("AUTH_TYPE", "plain")
                     .withEnv("POOL_MODE", "transaction")
                     .withEnv("DEFAULT_POOL_SIZE", "1")
                     .withEnv("MAX_CLIENT_CONN", "20")
