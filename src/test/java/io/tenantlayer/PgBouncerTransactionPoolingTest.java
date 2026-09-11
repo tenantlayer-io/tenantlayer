@@ -102,19 +102,30 @@ class PgBouncerTransactionPoolingTest {
     @Test
     @DisplayName("session-scoped control leaks over reused PgBouncer backend")
     void unsafeSessionScopedControlLeaks() {
-        TenantContext.runWithTenant(TenantScope.of("acme"), () ->
+        int acmeBackendPid = TenantContext.callWithTenant(TenantScope.of("acme"), () ->
                 controlTransaction(connection -> {
                     setSessionTenant(connection, "acme");
                     assertThat(count(connection)).isEqualTo(2);
+                    return backendPid(connection);
                 }));
 
-        TenantContext.runWithTenant(TenantScope.of("globex"), () ->
-                controlTransaction(connection -> {
-                    assertThat(backendPid(connection)).isEqualTo(controlBackendPid());
-                    assertThat(count(connection))
-                            .as("the unsafe session setting must be inherited by globex")
-                            .isEqualTo(2);
-                }));
+        int globexBackendPid;
+        try {
+            globexBackendPid = TenantContext.callWithTenant(TenantScope.of("globex"), () ->
+                    controlTransaction(connection -> {
+                        assertThat(count(connection))
+                                .as("the unsafe session setting must be inherited by globex")
+                                .isEqualTo(2);
+                        return backendPid(connection);
+                    }));
+        } finally {
+            controlTransaction(connection -> {
+                setSessionTenant(connection, "");
+                return null;
+            });
+        }
+
+        assertThat(globexBackendPid).isEqualTo(acmeBackendPid);
     }
 
     @Test
@@ -183,20 +194,18 @@ class PgBouncerTransactionPoolingTest {
         config.setUsername(APP_USER);
         config.setPassword(APP_PASSWORD);
         config.setPoolName(name);
-        // Some assertions inspect the backend PID while the control transaction still holds
-        // its connection; keep a second client slot without changing PgBouncer's one-backend
-        // transaction-pooling constraint.
-        config.setMaximumPoolSize(2);
+        config.setMaximumPoolSize(1);
         config.setMinimumIdle(0);
         config.setConnectionTimeout(10_000);
         return new HikariDataSource(config);
     }
 
-    private void controlTransaction(SqlWork work) {
+    private <T> T controlTransaction(SqlTransaction<T> work) {
         try (Connection connection = controlPool.getConnection()) {
             connection.setAutoCommit(false);
-            work.run(connection);
+            T result = work.apply(connection);
             connection.commit();
+            return result;
         } catch (Exception e) {
             throw new IllegalStateException("control transaction failed", e);
         }
@@ -210,14 +219,6 @@ class PgBouncerTransactionPoolingTest {
         return TenantContext.callWithTenant(TenantScope.of(tenant),
                 () -> strategyTransactions.execute(status -> body.apply(
                         DataSourceUtils.getConnection(strategyDataSource))));
-    }
-
-    private int controlBackendPid() {
-        try (Connection connection = controlPool.getConnection()) {
-            return backendPid(connection);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     private String outsideTransactionSetting() {
@@ -286,8 +287,8 @@ class PgBouncerTransactionPoolingTest {
     private record Sample(int rows, int backendPid) { }
 
     @FunctionalInterface
-    private interface SqlWork {
-        void run(Connection connection) throws Exception;
+    private interface SqlTransaction<T> {
+        T apply(Connection connection) throws Exception;
     }
 
     @FunctionalInterface
