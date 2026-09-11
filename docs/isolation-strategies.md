@@ -91,9 +91,10 @@ The discriminator gives you a tenant column that is populated correctly without 
 remembering to do it. RLS gives you the guarantee that holds when code does something the
 ORM never sees. Enabling both costs one annotation and one policy.
 
-Note what neither covers: a connection that has been unwrapped to a raw `PgConnection`, and
-anything running as superuser. The first is why enforcement at the JDBC layer is a Pro
-concern (Tenant Guard); the second is why your application must not connect as one.
+The session-scoped RLS strategy does not control a connection that has been unwrapped to a raw
+`PgConnection`; the transaction-scoped strategy deliberately binds before allowing an unwrap
+inside the transaction and PostgreSQL clears that local setting at its boundary. Anything
+running as superuser still bypasses RLS, which is why your application must not connect as one.
 
 ## Schema-per-tenant and database-per-tenant
 

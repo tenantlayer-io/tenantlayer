@@ -37,13 +37,11 @@ public class TenantRegistryAutoConfiguration {
     @ConditionalOnBean(DataSource.class)
     @ConditionalOnMissingBean
     TenantRegistry tenantRegistry(DataSource dataSource, TenantLayerProperties properties) {
-        /* Deliberately the unwrapped datasource. The registry answers "who are the
-           tenants?", which is asked before any tenant is bound — routing that question by
-           the acting tenant is a contradiction. It happens to work through the wrapper
-           under row-level security, and throws under database-per-tenant, which is the
-           same bug either way. */
-        return new JdbcTenantRegistry(
-                TenantAwareDataSource.unwrap(dataSource), properties.getRegistry().getTable());
+        /* JdbcTenantRegistry uses the transaction-bound connection when one exists, and the
+           underlying pool before a transaction exists. The registry itself is shared
+           infrastructure, but must not accidentally obtain a second connection inside a
+           transaction-scoped operation. */
+        return new JdbcTenantRegistry(dataSource, properties.getRegistry().getTable());
     }
 
     /**

@@ -147,7 +147,10 @@ Stop and treat this as an incident.
 3. Are you behind **PgBouncer in transaction or statement pooling mode**? Session-level
    settings are unsupported there, and the tenant can leak between clients. This is the
    most likely cause if the application is correct and the leak looks random.
-4. Is the query running through a connection that was unwrapped to a raw `PgConnection`?
+4. Is the query using the session-scoped strategy through a connection unwrapped to a raw
+   `PgConnection`? The transaction-scoped strategy supports vendor unwrap after it has bound
+   the transaction, but a retained raw connection still follows the normal JDBC resource
+   lifetime contract.
 5. Does the table have a policy at all? A table added recently may have been missed.
 
 If none of those explain it, [report it privately](https://github.com/tenantlayer-io/tenantlayer/security/advisories/new)

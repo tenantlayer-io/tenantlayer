@@ -2,6 +2,7 @@ package io.tenantlayer.registry;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.tenantlayer.core.TenantAwareDataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.sql.DataSource;
+import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Feature 50 — the registry, backed by one table.
@@ -46,6 +49,27 @@ public class JdbcTenantRegistry implements TenantRegistry {
     }
 
     /**
+     * Use Spring's transaction-bound connection when one exists, while keeping registry
+     * resolution usable before a transaction or tenant exists. The latter deliberately uses the
+     * underlying pool: the registry is shared infrastructure, and database-per-tenant routing
+     * cannot choose a tenant database until this query has identified one.
+     */
+    private DataSource connectionDataSource() {
+        return dataSource instanceof TenantAwareDataSource
+                && !TransactionSynchronizationManager.hasResource(dataSource)
+                ? TenantAwareDataSource.unwrap(dataSource)
+                : dataSource;
+    }
+
+    private Connection getConnection() {
+        return DataSourceUtils.getConnection(connectionDataSource());
+    }
+
+    private void releaseConnection(Connection connection) {
+        DataSourceUtils.releaseConnection(connection, connectionDataSource());
+    }
+
+    /**
      * The table name reaches SQL by string concatenation because a table cannot be a bind
      * parameter. That makes validating it the only thing standing between a configuration
      * property and an injection, so it is checked rather than assumed.
@@ -67,14 +91,16 @@ public class JdbcTenantRegistry implements TenantRegistry {
             return Optional.empty();
         }
         String sql = "select " + COLUMNS + " from " + table + " where tenant_id = ?";
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        Connection connection = getConnection();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, tenantId);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next() ? Optional.of(read(rs)) : Optional.empty();
             }
         } catch (SQLException e) {
             throw new TenantRegistryException("looking up tenant '" + tenantId + "' failed", e);
+        } finally {
+            releaseConnection(connection);
         }
     }
 
@@ -82,8 +108,8 @@ public class JdbcTenantRegistry implements TenantRegistry {
     public List<TenantRegistration> findAll() {
         String sql = "select " + COLUMNS + " from " + table + " order by tenant_id";
         List<TenantRegistration> all = new ArrayList<>();
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
+        Connection connection = getConnection();
+        try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet rs = statement.executeQuery()) {
             while (rs.next()) {
                 all.add(read(rs));
@@ -91,6 +117,8 @@ public class JdbcTenantRegistry implements TenantRegistry {
             return all;
         } catch (SQLException e) {
             throw new TenantRegistryException("listing tenants failed", e);
+        } finally {
+            releaseConnection(connection);
         }
     }
 
@@ -99,8 +127,8 @@ public class JdbcTenantRegistry implements TenantRegistry {
         String sql = "select tenant_id from " + table
                 + " where status = 'ACTIVE' order by tenant_id";
         List<String> ids = new ArrayList<>();
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
+        Connection connection = getConnection();
+        try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet rs = statement.executeQuery()) {
             while (rs.next()) {
                 ids.add(rs.getString(1));
@@ -108,6 +136,8 @@ public class JdbcTenantRegistry implements TenantRegistry {
             return ids;
         } catch (SQLException e) {
             throw new TenantRegistryException("listing active tenants failed", e);
+        } finally {
+            releaseConnection(connection);
         }
     }
 
@@ -119,8 +149,8 @@ public class JdbcTenantRegistry implements TenantRegistry {
                 + " tenant_group = excluded.tenant_group,"
                 + " datasource_ref = excluded.datasource_ref,"
                 + " metadata = excluded.metadata";
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        Connection connection = getConnection();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, registration.tenantId());
             statement.setString(2, registration.status().name());
             statement.setString(3, registration.region());
@@ -131,18 +161,22 @@ public class JdbcTenantRegistry implements TenantRegistry {
         } catch (SQLException e) {
             throw new TenantRegistryException(
                     "saving tenant '" + registration.tenantId() + "' failed", e);
+        } finally {
+            releaseConnection(connection);
         }
     }
 
     @Override
     public boolean delete(String tenantId) {
-        try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement =
+        Connection connection = getConnection();
+        try (PreparedStatement statement =
                      connection.prepareStatement("delete from " + table + " where tenant_id = ?")) {
             statement.setString(1, tenantId);
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new TenantRegistryException("deleting tenant '" + tenantId + "' failed", e);
+        } finally {
+            releaseConnection(connection);
         }
     }
 
