@@ -183,7 +183,10 @@ class PgBouncerTransactionPoolingTest {
         config.setUsername(APP_USER);
         config.setPassword(APP_PASSWORD);
         config.setPoolName(name);
-        config.setMaximumPoolSize(1);
+        // Some assertions inspect the backend PID while the control transaction still holds
+        // its connection; keep a second client slot without changing PgBouncer's one-backend
+        // transaction-pooling constraint.
+        config.setMaximumPoolSize(2);
         config.setMinimumIdle(0);
         config.setConnectionTimeout(10_000);
         return new HikariDataSource(config);
