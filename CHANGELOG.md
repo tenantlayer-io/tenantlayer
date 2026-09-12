@@ -135,6 +135,13 @@ once and is repopulated. That is the intended behaviour, not a defect.
 
 ### Added
 
+- **Transaction-scoped RLS binding** (#29). The opt-in
+  `ROW_LEVEL_SECURITY_TRANSACTION_SCOPED` strategy uses `SET LOCAL` at the Spring transaction
+  boundary for PgBouncer transaction pooling. It uses a connection-only lifecycle wrapper and
+  Spring's transaction execution listener, preserving normal metadata, vendor `unwrap`, and
+  statement/result-set behavior. Tenant-scoped statements outside an active transaction fail
+  closed, while the shared registry remains readable before a tenant exists. The existing
+  session-scoped default is unchanged.
 - **Tenant-scoped cache keys** (#13). Every cache is tenant-scoped unless named under
   `tenantlayer.cache.shared`. With no tenant bound, reads miss and writes are dropped — the
   underlying method still runs, so behaviour is correct and only slower.

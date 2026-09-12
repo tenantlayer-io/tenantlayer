@@ -16,6 +16,7 @@ import io.tenantlayer.strategy.DatabasePerTenantStrategy;
 import io.tenantlayer.strategy.TenantConnectionStrategy;
 import io.tenantlayer.strategy.TenantDataSourceProvider;
 import io.tenantlayer.strategy.TenantDatabase;
+import io.tenantlayer.strategy.TransactionScopedRowLevelSecurityStrategy;
 import io.tenantlayer.security.ClaimTenantMembershipVerifier;
 import io.tenantlayer.security.TenantMembershipVerifier;
 import io.tenantlayer.web.HeaderTenantResolver;
@@ -49,6 +50,9 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.ResourceTransactionManager;
 import org.springframework.util.ClassUtils;
 
 /**
@@ -104,6 +108,51 @@ public class TenantLayerAutoConfiguration {
     }
 
     /**
+     * Binds transaction-scoped RLS after Spring has completed the transaction manager's own
+     * begin sequence. This covers both JDBC and JPA transaction managers without making the
+     * strategy guess at isolation-level ordering from Connection method calls.
+     */
+    @Bean
+    static BeanPostProcessor tenantLayerTransactionManagerPostProcessor() {
+        return new BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String beanName)
+                    throws BeansException {
+                if (!(bean instanceof AbstractPlatformTransactionManager manager)
+                        || !(manager instanceof ResourceTransactionManager resourceManager)) {
+                    return bean;
+                }
+
+                TenantAwareDataSource dataSource = transactionDataSource(manager, resourceManager);
+                if (dataSource == null
+                        || !(dataSource.strategy()
+                                instanceof TransactionScopedRowLevelSecurityStrategy strategy)) {
+                    return bean;
+                }
+
+                List<org.springframework.transaction.TransactionExecutionListener> listeners =
+                        new ArrayList<>(manager.getTransactionExecutionListeners());
+                listeners.add(strategy.transactionExecutionListener(dataSource));
+                manager.setTransactionExecutionListeners(listeners);
+                return bean;
+            }
+
+            private TenantAwareDataSource transactionDataSource(
+                    AbstractPlatformTransactionManager manager,
+                    ResourceTransactionManager resourceManager) {
+                if (resourceManager.getResourceFactory() instanceof TenantAwareDataSource dataSource) {
+                    return dataSource;
+                }
+                if (manager instanceof JpaTransactionManager jpaManager
+                        && jpaManager.getDataSource() instanceof TenantAwareDataSource dataSource) {
+                    return dataSource;
+                }
+                return null;
+            }
+        };
+    }
+
+    /**
      * Row-level security unless configured otherwise, so upgrading changes nothing. The
      * strategy is chosen once at start-up — selecting it per request would be a way to
      * read another tenant's data by changing one property.
@@ -119,6 +168,8 @@ public class TenantLayerAutoConfiguration {
         }
         return switch (properties.getStrategy()) {
             case ROW_LEVEL_SECURITY -> new RowLevelSecurityStrategy(dataSource);
+            case ROW_LEVEL_SECURITY_TRANSACTION_SCOPED ->
+                    new TransactionScopedRowLevelSecurityStrategy(dataSource);
             case SCHEMA_PER_TENANT ->
                     new SchemaPerTenantStrategy(dataSource, properties.getSchema().getPrefix());
             case DATABASE_PER_TENANT ->

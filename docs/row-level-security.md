@@ -196,19 +196,54 @@ someone else's query. That is a cross-tenant read, and nothing downstream will c
 |---|---|---|
 | HikariCP or any in-process pool | — | **yes** |
 | PgBouncer | session | **yes** |
-| PgBouncer | transaction | **no** |
+| PgBouncer | transaction, session-scoped strategy | **no** |
+| PgBouncer | transaction-scoped strategy | **yes** |
 | PgBouncer | statement | **no** |
 | Supabase Supavisor, RDS Proxy, pgcat | session-equivalent | yes |
-| Supabase Supavisor, RDS Proxy, pgcat | transaction | **no** |
+| Supabase Supavisor, RDS Proxy, pgcat | transaction, session-scoped strategy | **no** |
+| Supabase Supavisor, RDS Proxy, pgcat | transaction-scoped strategy | **yes** |
 
-If you are on transaction pooling today, the options are to move that application to session
-pooling, to connect it directly to Postgres, or to use the discriminator strategy
-(`@TenantId`), which puts the predicate in the statement rather than in session state.
+If you are on transaction pooling today, configure the opt-in transaction-scoped strategy:
 
 Doing this correctly under transaction pooling means binding the tenant at **transaction
-start** rather than at connection checkout, with `SET LOCAL` inside the transaction — which
-is a different hook and is not built. It is tracked as
-[issue #29](https://github.com/tenantlayer-io/tenantlayer/issues/29).
+start** rather than at connection checkout, with `SET LOCAL` inside the transaction.
+
+```properties
+tenantlayer.strategy=ROW_LEVEL_SECURITY_TRANSACTION_SCOPED
+```
+
+This strategy binds the tenant from Spring's transaction lifecycle after the transaction manager
+has applied the transaction definition. For manually constructed JDBC transaction managers, the
+connection wrapper binds immediately before the first statement in a non-auto-commit
+transaction. The SQL is:
+
+```sql
+select set_config('tenantlayer.tenant', ?, true)
+```
+
+The `true` makes the setting local to that transaction. PostgreSQL removes it at both commit
+and rollback, before a PgBouncer transaction-pool connection can be assigned to the next
+client. It works with Spring's JDBC transaction managers and with code that uses the same JDBC
+transaction lifecycle directly.
+
+The strategy is deliberately fail-closed outside a transaction. Tenant-scoped work attempted
+while auto-commit is enabled throws instead of running with an empty or stale tenant. Shared
+infrastructure such as `JdbcTenantRegistry` remains readable before a tenant exists, while the
+checkout path clears the GUC to the empty value so tenant-scoped tables still return no rows.
+Health checks and other genuinely unscoped paths should use a separate, explicitly configured
+DataSource.
+
+The strategy wraps only `Connection` to provide that lifecycle fallback. Statements, result
+sets, metadata, and vendor interfaces are returned normally. `Connection.unwrap(...)` is
+supported after the transaction has been bound, so Hibernate `doWork`, JDBI, Flyway, PostgreSQL
+COPY, and ordinary JDBC metadata access do not need strategy-specific escape paths. A caller
+that retains an unwrapped vendor connection beyond the transaction boundary is responsible for
+the normal JDBC resource-lifetime contract; PostgreSQL has already reverted the tenant-local
+setting at that boundary.
+
+The default remains `ROW_LEVEL_SECURITY`, because it safely supports autocommit reads on an
+ordinary application-side pool. Do not select the transaction-scoped strategy unless the
+application guarantees transaction demarcation for every tenant-scoped database operation.
 
 > **Why this is not simply the default.** `SET LOCAL` requires a transaction to be local to,
 > and plenty of reads run in autocommit — a `@Transactional(readOnly = true)` that was
@@ -225,3 +260,8 @@ assertion passing for the wrong reason — including after someone deletes the p
 
 `TenantPostgres` (see [Testing](testing.md)) gives you a least-privileged connection for
 the code under test and a separate privileged one for seeding.
+
+The repository's Testcontainers fixture does not include a PgBouncer service. The strategy's
+transaction and RLS tests therefore prove the binding and isolation contract against real
+Postgres, but a real PgBouncer transaction-mode multiplexing run must still be supplied by CI
+or an environment that provides that proxy.
