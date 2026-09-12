@@ -6,6 +6,22 @@ listed here.
 
 ## Unreleased
 
+### Status enforcement no longer breaks applications that have no registry table
+
+The registry bean is autoconfigured whenever a DataSource exists, so enforcing tenant status
+put a query against `tenantlayer_tenants` on the request path of every application — including
+the many that never created that table, because `getting-started` never asks anyone to. The
+result would have been an application that worked yesterday answering errors today, on a minor
+upgrade.
+
+The table is now probed once at start-up instead of discovered per request. If it is not there,
+enforcement is switched off for the run and says so at ERROR level, naming the two ways to fix
+it. Nothing is lost: an application with no registry table has no suspended tenants to refuse.
+
+Any *other* failure leaves enforcement on. A database briefly unreachable during start-up must
+not be able to disable a security control for the lifetime of the process.
+
+
 ### Suspended tenants are refused, not served
 
 The registry's `status` column has existed since 0.1.0 and, by its own javadoc, was "carried
