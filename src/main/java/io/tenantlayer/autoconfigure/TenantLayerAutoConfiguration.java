@@ -8,28 +8,30 @@ import io.tenantlayer.core.TenantResolver;
 import io.tenantlayer.core.TenantResolverChain;
 import io.tenantlayer.core.TenantTaskDecorator;
 import io.tenantlayer.hibernate.TenantContextIdentifierResolver;
-import io.tenantlayer.strategy.RowLevelSecurityStrategy;
-import io.tenantlayer.strategy.SchemaPerTenantStrategy;
 import io.tenantlayer.registry.TenantRegistry;
+import io.tenantlayer.security.ClaimTenantMembershipVerifier;
+import io.tenantlayer.security.TenantMembershipVerifier;
 import io.tenantlayer.strategy.ConfiguredTenantDataSourceProvider;
 import io.tenantlayer.strategy.DatabasePerTenantStrategy;
+import io.tenantlayer.strategy.RowLevelSecurityStrategy;
+import io.tenantlayer.strategy.SchemaPerTenantStrategy;
 import io.tenantlayer.strategy.TenantConnectionStrategy;
 import io.tenantlayer.strategy.TenantDataSourceProvider;
 import io.tenantlayer.strategy.TenantDatabase;
 import io.tenantlayer.strategy.TransactionScopedRowLevelSecurityStrategy;
-import io.tenantlayer.security.ClaimTenantMembershipVerifier;
-import io.tenantlayer.security.TenantMembershipVerifier;
 import io.tenantlayer.web.HeaderTenantResolver;
 import io.tenantlayer.web.JwtClaimTenantResolver;
 import io.tenantlayer.web.PathSegmentTenantResolver;
 import io.tenantlayer.web.SubdomainTenantResolver;
 import io.tenantlayer.web.TenantFilter;
 import jakarta.servlet.http.HttpServletRequest;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -66,6 +68,9 @@ import org.springframework.util.ClassUtils;
 @ConditionalOnClass(DataSource.class)
 @EnableConfigurationProperties(TenantLayerProperties.class)
 public class TenantLayerAutoConfiguration {
+
+    /** Probe only. Never a real tenant; the row is not expected to exist. */
+    private static final String STATUS_PROBE_TENANT = "__tenantlayer_probe__";
 
     /**
      * Spring Security registers its filter chain at -100. Anything that needs an
@@ -289,12 +294,61 @@ public class TenantLayerAutoConfiguration {
         // "is this tenant already active?" keeps reading the truth.
         TenantLayerProperties.Registry registryProperties = properties.getRegistry();
         TenantRegistry statusSource = registryProperties.isEnforceStatus()
-                ? registry.getIfAvailable() : null;
+                ? enforceableRegistry(registry.getIfAvailable()) : null;
         FilterRegistrationBean<TenantFilter> registration = new FilterRegistrationBean<>(
                 new TenantFilter(resolver, properties.isStrict(), properties.getUnscopedPaths(),
                         verifier, statusSource, registryProperties.getStatusCacheTtl()));
         registration.setOrder(filterOrder(properties, verifier != null));
         return registration;
+    }
+
+    /**
+     * The registry bean exists whenever a DataSource does — nobody opts in — so enforcing
+     * status would otherwise put a query against {@code tenantlayer_tenants} on the request
+     * path of every application that never created that table. That is an application which
+     * worked yesterday answering nothing but errors today, and getting-started never asks
+     * anyone to create the table, so the documented happy path is exactly the broken one.
+     *
+     * <p>So the table is probed once, here, rather than discovered per request. A table that
+     * is not there means this deployment does not use the registry: enforcement is switched
+     * off for the run and says so loudly. Nothing is lost by that — an application with no
+     * registry table has no suspended tenants to refuse.
+     *
+     * <p>Any other failure leaves enforcement <em>on</em>. A database that is briefly
+     * unreachable at start-up must not be able to turn a security control off for the
+     * lifetime of the process; that would be a far better attack than the one this guards.
+     */
+    static TenantRegistry enforceableRegistry(TenantRegistry registry) {
+        if (registry == null) {
+            return null;
+        }
+        try {
+            registry.find(STATUS_PROBE_TENANT);
+            return registry;
+        } catch (RuntimeException e) {
+            if (!isUndefinedTable(e)) {
+                return registry;
+            }
+            LoggerFactory.getLogger(TenantLayerAutoConfiguration.class).error(
+                    "tenantlayer.registry.enforce-status is on, but the registry table does not "
+                            + "exist. Suspended tenants will NOT be refused. Create the table "
+                            + "(TenantRegistrySchema.DDL), or set "
+                            + "tenantlayer.registry.enforce-status=false to say so deliberately.");
+            return null;
+        }
+    }
+
+    /** 42P01 is Postgres for "undefined table" — the one failure that means "not configured". */
+    private static boolean isUndefinedTable(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && "42P01".equals(sql.getSQLState())) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /**
