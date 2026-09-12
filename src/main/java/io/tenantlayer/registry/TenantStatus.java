@@ -4,9 +4,10 @@ package io.tenantlayer.registry;
  * Lifecycle state of a registered tenant.
  *
  * <p>The column exists from v0.1 (feature 50) so that the schema does not have to change
- * later. <em>Enforcing</em> it at resolution time is feature 54 and belongs to v0.2 — this
- * enum is carried and reported, not yet used to reject requests. Anything that claims
- * otherwise would be claiming a control the library does not currently apply.
+ * later. Since feature 54 it is <em>enforced</em> in two places, and they agree: a tenant
+ * that is not {@link #ACTIVE} is skipped by {@code forEachTenant} and refused with a 403 by
+ * {@code TenantFilter} before any connection is bound. Only ACTIVE is served, so a status
+ * added later is fail-closed until something decides otherwise.
  */
 public enum TenantStatus {
 

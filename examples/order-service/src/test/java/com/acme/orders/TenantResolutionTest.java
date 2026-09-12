@@ -19,7 +19,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Features 1, 2, 3, 6 and 7 — every way the tenant can arrive, driven over real HTTP.
+ * Features 1, 2, 3, 6, 7 and 54 — every way the tenant can arrive, driven over real
+ * HTTP, and what happens when the tenant that arrives is suspended.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
@@ -92,14 +93,14 @@ class TenantResolutionTest {
     @Test
     @DisplayName("feature 3 — the tenant arrives as a path segment")
     void pathSegmentResolver() {
-        api.placeAs("initech", "Peter Gibbons", "Red stapler", 1999);
+        api.placeAs("acme", "Peter Gibbons", "Red stapler", 1999);
 
         ResponseEntity<JsonNode> response =
-                api.getWithHeaders("/t/initech/orders", new HttpHeaders());
+                api.getWithHeaders("/t/acme/orders", new HttpHeaders());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody().get(0).get("tenantId").asText()).isEqualTo("initech");
+        assertThat(response.getBody().get(0).get("tenantId").asText()).isEqualTo("acme");
     }
 
     @Test
@@ -121,11 +122,11 @@ class TenantResolutionTest {
     @Test
     @DisplayName("feature 6 — falls through to the next resolver when the first has no opinion")
     void fallsThroughToPath() {
-        api.placeAs("initech", "Milton Waddams", "Stapler", 2499);
+        api.placeAs("acme", "Milton Waddams", "Stapler", 2499);
 
         // No header, host carries no usable subdomain -> the path resolver answers.
         ResponseEntity<JsonNode> response =
-                api.getWithHeaders("/t/initech/orders", new HttpHeaders());
+                api.getWithHeaders("/t/acme/orders", new HttpHeaders());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotEmpty();
@@ -140,5 +141,21 @@ class TenantResolutionTest {
         assertThat(response.getStatusCode())
                 .as("an empty list would read as 'no data' and hide the real problem")
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("feature 54 — a suspended tenant is refused at the door")
+    void suspendedTenantIsRefused() {
+        // initech is seeded SUSPENDED in schema.sql, and ScheduledJobIsolationTest leans on
+        // the same row from the other side: the nightly job skips it. This is the request
+        // half of one rule, and the pair is the point — a tenant is never off for the job
+        // and still answering its users.
+        assertThat(api.getAs("/orders", "initech").getStatusCode())
+                .as("suspended means refused before any connection is bound, not served")
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        assertThat(api.getAs("/orders", "acme").getStatusCode())
+                .as("without this, the assertion above would pass with everything refused")
+                .isEqualTo(HttpStatus.OK);
     }
 }

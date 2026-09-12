@@ -115,17 +115,10 @@ TenantMembershipVerifier tenantMembershipVerifier(MembershipRepository membershi
 The verifier receives only the tenant — the caller comes from the `SecurityContext`, which
 Spring Security has populated by the time this runs.
 
-You can also combine it with the registry, so a suspended tenant is refused at the door
-rather than merely skipped by background jobs:
-
-```java
-@Bean
-TenantMembershipVerifier tenantMembershipVerifier(
-        MembershipRepository memberships, TenantRegistry registry) {
-    return tenantId -> registry.find(tenantId).map(TenantRegistration::isActive).orElse(false)
-            && memberships.exists(currentPrincipalName(), tenantId);
-}
-```
+The verifier does not need to check the registry's status column. When a `TenantRegistry`
+bean exists (and `tenantlayer.registry.enforce-status` is left on) the filter consults it
+after membership and refuses any tenant that is not `ACTIVE` with a 403 — see
+[the tenant registry](tenant-registry.md#suspending-a-tenant).
 
 ## Proving it
 
@@ -155,15 +148,15 @@ would pass on a fresh database, which is how this gets shipped.
 Then turn membership off and confirm the test fails. If it still passes, it was never
 testing membership.
 
-## The two questions, side by side
+## The three questions, side by side
 
-| | Resolution | Membership |
-|---|---|---|
-| Answers | Which tenant does this request claim? | Is this caller entitled to it? |
-| Reads | Header, subdomain, path, token claim | The authenticated principal |
-| Fails with | 400 (strict mode) | 403 |
-| Configured by | `tenantlayer.resolvers` | `tenantlayer.membership.enabled` |
-| Enough on its own | Only behind a header-overwriting gateway | — |
+| | Resolution | Membership | Status |
+|---|---|---|---|
+| Answers | Which tenant does this request claim? | Is this caller entitled to it? | Is that tenant currently live? |
+| Reads | Header, subdomain, path, token claim | The authenticated principal | The tenant registry |
+| Fails with | 400 (strict mode) | 403 | 403 |
+| Configured by | `tenantlayer.resolvers` | `tenantlayer.membership.enabled` | `tenantlayer.registry.enforce-status`, on by default when a `TenantRegistry` bean exists |
+| Enough on its own | Only behind a header-overwriting gateway | — | — |
 
-A public API needs both. An internal service behind a trust boundary can get away with the
+A public API needs the first two; the third comes with the registry. An internal service behind a trust boundary can get away with the
 first, right up until the day it is exposed — which is rarely a decision anyone announces.

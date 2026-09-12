@@ -66,6 +66,10 @@ class OrderIsolationTest {
             statement.execute(readSchema());
             statement.execute("grant usage on schema public to " + APP_USER);
             statement.execute("grant select, insert, update, delete on orders to " + APP_USER);
+            // The filter reads the registry on every request to check the tenant's status,
+            // and this role is neither superuser nor owner, so the read has to be granted.
+            // Select only: nothing on the request path writes to it.
+            statement.execute("grant select on tenantlayer_tenants to " + APP_USER);
             statement.execute("grant usage, select on all sequences in schema public to " + APP_USER);
         }
     }

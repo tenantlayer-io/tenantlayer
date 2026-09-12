@@ -363,6 +363,22 @@ public class TenantLayerProperties {
         /** Table the registry reads and writes. */
         private String table = TenantRegistrySchema.DEFAULT_TABLE;
 
+        /**
+         * Feature 54. Refuse requests for a tenant whose registry status is not ACTIVE.
+         * On by default because the alternative is a suspension that only the nightly job
+         * honours; off is for a deployment that wants the registry for iteration and
+         * provisioning but does not want a lookup on the request path.
+         */
+        private boolean enforceStatus = true;
+
+        /**
+         * How long the filter trusts a tenant's status before asking the registry again.
+         * Enforcement is per request and can live with an answer a few seconds old;
+         * suspension then takes effect within this window rather than instantly. Zero
+         * disables the cache and looks the status up on every scoped request.
+         */
+        private java.time.Duration statusCacheTtl = java.time.Duration.ofSeconds(30);
+
         public boolean isEnabled() {
             return enabled;
         }
@@ -377,6 +393,22 @@ public class TenantLayerProperties {
 
         public void setTable(String table) {
             this.table = table;
+        }
+
+        public boolean isEnforceStatus() {
+            return enforceStatus;
+        }
+
+        public void setEnforceStatus(boolean enforceStatus) {
+            this.enforceStatus = enforceStatus;
+        }
+
+        public java.time.Duration getStatusCacheTtl() {
+            return statusCacheTtl;
+        }
+
+        public void setStatusCacheTtl(java.time.Duration statusCacheTtl) {
+            this.statusCacheTtl = statusCacheTtl;
         }
     }
 

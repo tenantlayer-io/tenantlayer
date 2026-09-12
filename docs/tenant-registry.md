@@ -18,6 +18,19 @@ create table tenantlayer_tenants (
 Create it through your own migration tool. TenantLayer does not issue DDL against your
 database; `TenantRegistrySchema.DDL` is the statement, for you to commit and review.
 
+The role your application connects as must be able to read it:
+
+```sql
+grant select on tenantlayer_tenants to <your application role>;
+```
+
+That role is normally neither superuser nor the table's owner — this project tells you not
+to make it either, because both bypass row-level security — so the grant does not come for
+free. `TenantFilter` reads this table to check the tenant's status (once per tenant every
+thirty seconds by default, see below), and without the grant every request fails with
+`permission denied for table tenantlayer_tenants` rather than being served. Read is enough;
+nothing on the request path writes here.
+
 ## It has no row-level security, deliberately
 
 The registry is shared infrastructure that gets consulted *during* tenant resolution,
@@ -30,7 +43,7 @@ should have one; this one must not.
 | Column | Read by | Meaning |
 |---|---|---|
 | `tenant_id` | everything | The identifier resolution produces |
-| `status` | `forEachTenant`, membership | `ACTIVE` or `SUSPENDED`. Suspended tenants are skipped by iteration. |
+| `status` | `TenantFilter`, `forEachTenant`, provisioning | `ACTIVE`, `SUSPENDED` or `PROVISIONING`. Anything other than `ACTIVE` is refused at resolution with a 403 and skipped by iteration. |
 | `datasource_ref` | `DATABASE_PER_TENANT` | Which database this tenant lives in — several tenants may share one |
 | `region`, `tenant_group` | nothing yet | Reserved |
 | `metadata` | your code | Anything you want to hang off a tenant |
@@ -71,7 +84,23 @@ registry.save(new TenantRegistration(
         Map.of("plan", "enterprise")));
 ```
 
-Suspending a tenant is a status change, and iteration stops including them immediately:
+### Suspending a tenant
+
+Suspending a tenant is a status change, and both readers agree on what it means:
+`TenantFilter` refuses the tenant with a 403 before any connection is bound, and
+`forEachTenant` leaves it out.
+
+It takes effect on the next `forEachTenant` run, and on requests **within the status cache
+TTL** — thirty seconds by default (`tenantlayer.registry.status-cache-ttl`). The filter
+checks status on every scoped request, so it remembers the answer rather than querying the
+table each time; a tenant suspended a moment ago may be served for up to one TTL before the
+403 lands. Set the TTL to `0s` if you would rather pay a lookup per request for an instant
+cut-off. Only the filter's lookup is cached: `registry.find()` always reads the table, which
+is what lets provisioning stay idempotent and iteration stay exact.
+
+The check is on whenever a `TenantRegistry` bean exists. Setting
+`tenantlayer.registry.enforce-status=false` turns it off while keeping the registry for
+everything else.
 
 ```java
 registry.find("acme").ifPresent(t -> registry.save(
@@ -121,7 +150,8 @@ void rebuildReports() {
 ```
 
 Each iteration runs with that tenant bound, so `reportService` needs no tenant parameter
-and its queries scope themselves. Suspended tenants are skipped.
+and its queries scope themselves. Suspended tenants are skipped, exactly as their requests
+are refused — a tenant is never off for its users and on for the nightly job.
 
 **One tenant's failure does not cancel the rest.** A nightly job that aborts on the first
 bad tenant leaves everyone after it in the list unprocessed, and which ones those are

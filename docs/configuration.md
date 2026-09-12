@@ -34,8 +34,10 @@ Requires Spring Security on the classpath.
 
 | Property | Default | Meaning |
 |---|---|---|
-| `tenantlayer.registry.enabled` | `true` | Expose a `TenantRegistry` backed by the application DataSource. |
+| `tenantlayer.registry.enabled` | `true` | Expose a `TenantRegistry` backed by the application DataSource. Iteration, provisioning and status enforcement all need it, so the table must exist. |
 | `tenantlayer.registry.table` | `tenantlayer_tenants` | Table the registry reads and writes. Validated as a plain SQL identifier. |
+| `tenantlayer.registry.enforce-status` | `true` | `TenantFilter` refuses a tenant whose registry status is not `ACTIVE` with a 403, before it is bound. Off keeps the registry for iteration and provisioning but takes the lookup off the request path. |
+| `tenantlayer.registry.status-cache-ttl` | `30s` | How long the filter trusts a tenant's status before asking the registry again. Suspension takes effect within this window, not instantly. `0s` looks the status up on every scoped request. Only the filter's lookup is cached; `TenantRegistry.find()` itself is not. |
 
 ## Schema scanning and policy generation
 
