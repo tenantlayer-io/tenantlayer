@@ -3,6 +3,8 @@ package io.tenantlayer.cache;
 import io.tenantlayer.core.TenantContext;
 import io.tenantlayer.core.TenantScope;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -76,6 +78,46 @@ public class TenantAwareCache implements Cache {
             }
         }
         return delegate.get(qualified, valueLoader);
+    }
+
+    /**
+     * The async read behind {@code @Cacheable} on a method returning {@code CompletableFuture}.
+     * The interface default throws, so without this override adding TenantLayer breaks async
+     * caching outright. Passing the raw key through instead would be worse: the delegate would
+     * hand one tenant another's value. With no tenant it is a miss, as in {@link #get(Object)}.
+     */
+    @Override
+    @Nullable
+    public CompletableFuture<?> retrieve(Object key) {
+        Object qualified = qualify(key);
+        return qualified == null ? null : delegate.retrieve(qualified);
+    }
+
+    /**
+     * The async read-through behind {@code @Cacheable(sync = true)}. With no tenant the loader
+     * still runs but its result is not stored, as in {@link #get(Object, Callable)}.
+     *
+     * <p>The loader is run with the caller's tenant bound, because the delegate decides which
+     * thread runs it: {@code ConcurrentMapCache} uses the common pool, where nothing is bound.
+     * Left alone, a tenant-scoped query in the cached method would run as no tenant, and its
+     * empty result would be stored under this tenant's key.
+     *
+     * <p>A loader that throws is reported through the returned future, as the {@code Cache}
+     * contract asks. Thrown from here, Spring would take it for a cache failure, and an error
+     * handler that only logs would then run the cached method a second time.
+     */
+    @Override
+    public <T> CompletableFuture<T> retrieve(Object key, Supplier<CompletableFuture<T>> valueLoader) {
+        Object qualified = qualify(key);
+        if (qualified == null) {
+            try {
+                return valueLoader.get();
+            } catch (RuntimeException e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
+        TenantScope caller = TenantContext.require();
+        return delegate.retrieve(qualified, () -> TenantContext.callWithTenant(caller, valueLoader::get));
     }
 
     @Override

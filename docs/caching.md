@@ -68,6 +68,22 @@ The alternative would be to fall back to an unqualified key, which would put an 
 result into a namespace every tenant can read. That is precisely the failure this feature
 exists to prevent, so it fails closed instead.
 
+## Async methods
+
+`@Cacheable` on a method returning `CompletableFuture` is qualified the same way, with or
+without `sync = true`, and follows the same no-tenant rule.
+
+With `sync = true` the method runs with the caller's tenant bound, even when the cache
+provider runs it on another thread. Spring's default `ConcurrentMapCache` does exactly that,
+and without the binding a tenant-scoped query inside the method would run as no tenant.
+
+Without `sync`, Spring stores the result once the future completes, and that can happen on
+the thread that completed it rather than the caller's. The key is qualified with whatever
+tenant is bound there: with none, the write is dropped and the next call runs the method
+again; with another tenant, the result would be stored as theirs. If your futures can
+complete on a thread that is not carrying the caller's tenant, use `sync = true`, which
+qualifies the key before the method runs.
+
 ## Evicting one tenant
 
 Needed whenever a tenant is suspended, deleted or moved. Without it, suspending a tenant

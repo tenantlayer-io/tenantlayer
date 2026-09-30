@@ -3,19 +3,30 @@ package io.tenantlayer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.tenantlayer.autoconfigure.TenantCacheAutoConfiguration;
 import io.tenantlayer.cache.TenantAwareCacheManager;
 import io.tenantlayer.cache.TenantCacheEvictor;
 import io.tenantlayer.core.TenantContext;
 import io.tenantlayer.core.TenantScope;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.Nullable;
 
 /**
  * Features 96 and 97 — the hole a cache punches through every other isolation layer.
@@ -28,6 +39,13 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 class CacheIsolationTest {
 
     private CacheManager manager;
+
+    /** The real wiring: Boot's default cache, wrapped by TenantLayer's post-processor. */
+    private final ApplicationContextRunner asyncCaching = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(
+                    CacheAutoConfiguration.class, TenantCacheAutoConfiguration.class))
+            .withUserConfiguration(InvoiceConfig.class)
+            .withPropertyValues("spring.cache.type=simple");
 
     @BeforeEach
     void setUp() {
@@ -159,6 +177,149 @@ class CacheIsolationTest {
                 .as("believing data was evicted when it was not is worse than an error")
                 .isInstanceOf(UnsupportedOperationException.class)
                 .hasMessageContaining("silently remove nothing");
+    }
+
+    @Test
+    @DisplayName("async reads are qualified too — one tenant cannot read another's value")
+    void asyncTenantsDoNotShareCachedValues() {
+        TenantContext.runWithTenant(TenantScope.of("acme"),
+                () -> orders().retrieve(1L, () -> CompletableFuture.completedFuture("acme order")).join());
+
+        Object asAcme = TenantContext.callWithTenant(TenantScope.of("acme"), () -> retrieved(1L));
+        Object asGlobex = TenantContext.callWithTenant(TenantScope.of("globex"), () -> retrieved(1L));
+        String loadedByGlobex = TenantContext.callWithTenant(TenantScope.of("globex"),
+                () -> orders().retrieve(1L, () -> CompletableFuture.completedFuture("globex order")).join());
+
+        assertThat(asAcme)
+                .as("acme must still get its own cached value, or this test is vacuous")
+                .isEqualTo("acme order");
+        assertThat(asGlobex)
+                .as("globex asked for the same cache key and must not receive acme's value")
+                .isNull();
+        assertThat(loadedByGlobex)
+                .as("globex's read-through must load its own value, not be handed acme's")
+                .isEqualTo("globex order");
+    }
+
+    @Test
+    @DisplayName("async with no tenant bound: reads miss, and the loader runs uncached")
+    void asyncWithNoTenantBypassesTheCache() {
+        TenantContext.runWithTenant(TenantScope.of("acme"),
+                () -> orders().retrieve(1L, () -> CompletableFuture.completedFuture("acme order")).join());
+        AtomicInteger calls = new AtomicInteger();
+        Supplier<CompletableFuture<String>> loader = () -> {
+            calls.incrementAndGet();
+            return CompletableFuture.completedFuture("computed");
+        };
+
+        assertThat(orders().retrieve(1L))
+                .as("an untenanted async read must not reach into any tenant's namespace")
+                .isNull();
+        assertThat(orders().retrieve(9L, loader).join()).isEqualTo("computed");
+        assertThat(orders().retrieve(9L, loader).join()).isEqualTo("computed");
+        assertThat(calls.get())
+                .as("behaviour stays correct without a tenant; only the caching is skipped")
+                .isEqualTo(2);
+        assertThat(TenantContext.callWithTenant(TenantScope.of("acme"), () -> retrieved(9L)))
+                .as("an untenanted async write must not land somewhere a tenant can read it")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("with no tenant, a failing loader fails the future rather than throwing")
+    void asyncLoaderFailureWithNoTenantIsReportedThroughTheFuture() {
+        IllegalStateException failure = new IllegalStateException("loader failed");
+
+        CompletableFuture<String> result = orders().retrieve(9L, () -> {
+            throw failure;
+        });
+
+        assertThat(result)
+                .as("thrown instead, Spring treats it as a cache error and may run the method twice")
+                .isCompletedExceptionally();
+        assertThatThrownBy(result::join).hasCause(failure);
+    }
+
+    @Test
+    @DisplayName("@Cacheable on a CompletableFuture method caches per tenant")
+    void asyncCacheableIsPerTenant() {
+        asyncCaching.run(context -> {
+            Invoices invoices = context.getBean(Invoices.class);
+
+            String acme = TenantContext.callWithTenant(TenantScope.of("acme"), () -> invoices.find(1L).join());
+            String acmeAgain = TenantContext.callWithTenant(TenantScope.of("acme"), () -> invoices.find(1L).join());
+            String globex = TenantContext.callWithTenant(TenantScope.of("globex"), () -> invoices.find(1L).join());
+
+            assertThat(acme).isEqualTo("acme invoice 1, load 1");
+            assertThat(acmeAgain)
+                    .as("acme's second call must be served its own cached value")
+                    .isEqualTo(acme);
+            assertThat(globex)
+                    .as("globex asked for the same key and must not be served acme's value")
+                    .isEqualTo("globex invoice 1, load 2");
+        });
+    }
+
+    @Test
+    @DisplayName("@Cacheable(sync = true) on a CompletableFuture method caches per tenant, as the caller")
+    void syncAsyncCacheableIsPerTenantAndLoadsAsTheCaller() {
+        asyncCaching.run(context -> {
+            Invoices invoices = context.getBean(Invoices.class);
+
+            String acme = TenantContext.callWithTenant(TenantScope.of("acme"), () -> invoices.findSync(1L).join());
+            String acmeAgain = TenantContext.callWithTenant(TenantScope.of("acme"), () -> invoices.findSync(1L).join());
+            String globex = TenantContext.callWithTenant(TenantScope.of("globex"), () -> invoices.findSync(1L).join());
+
+            assertThat(acme)
+                    .as("ConcurrentMapCache runs the loader on the common pool; it must still run as acme")
+                    .isEqualTo("acme invoice 1, load 1");
+            assertThat(acmeAgain)
+                    .as("acme's second call must be served its own cached value")
+                    .isEqualTo(acme);
+            assertThat(globex)
+                    .as("globex asked for the same key and must not be served acme's value")
+                    .isEqualTo("globex invoice 1, load 2");
+        });
+    }
+
+    /** What {@code retrieve(key)} holds, unwrapped; {@code null} on a miss. */
+    @Nullable
+    private Object retrieved(Object key) {
+        CompletableFuture<?> future = orders().retrieve(key);
+        if (future == null) {
+            return null;
+        }
+        Object value = future.join();
+        return value instanceof Cache.ValueWrapper wrapper ? wrapper.get() : value;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableCaching
+    static class InvoiceConfig {
+        @Bean
+        Invoices invoices() {
+            return new Invoices();
+        }
+    }
+
+    /** Each load records the tenant it ran as, so a value served to the wrong tenant shows. */
+    static class Invoices {
+        private final AtomicInteger loads = new AtomicInteger();
+
+        @Cacheable("invoices")
+        public CompletableFuture<String> find(long id) {
+            return CompletableFuture.completedFuture(load(id));
+        }
+
+        @Cacheable(cacheNames = "receipts", sync = true)
+        public CompletableFuture<String> findSync(long id) {
+            return CompletableFuture.completedFuture(load(id));
+        }
+
+        private String load(long id) {
+            String tenant = TenantContext.current().map(TenantScope::subject).orElse("no tenant");
+            return tenant + " invoice " + id + ", load " + loads.incrementAndGet();
+        }
     }
 
     /** A cache whose native form cannot be enumerated, like Redis. */
