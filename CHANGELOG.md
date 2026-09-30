@@ -6,6 +6,19 @@ listed here.
 
 ## Unreleased
 
+### Async `@Cacheable` works with TenantLayer on the classpath
+
+`@Cacheable` on a method returning `CompletableFuture` goes through `Cache.retrieve(...)`,
+added in Spring 6.1. `TenantAwareCache` did not override either overload and the interface
+default throws, so adding TenantLayer broke every async cached method. Both are now
+qualified with the acting tenant and follow the rule the synchronous methods already do: no
+tenant means a miss, and a loader that runs without its result being stored.
+
+With `sync = true` the cached method runs with the caller's tenant bound, whichever thread
+the cache provider calls it from. Spring's default `ConcurrentMapCache` calls it from the
+common pool, where a tenant-scoped query would otherwise run as no tenant and its empty
+result would be cached under the caller's key.
+
 ### Status enforcement no longer breaks applications that have no registry table
 
 The registry bean is autoconfigured whenever a DataSource exists, so enforcing tenant status
