@@ -6,6 +6,26 @@ listed here.
 
 ## Unreleased
 
+### Typed tenant metadata
+
+The registry's `metadata` column has always round-tripped a `Map<String,String>`. It still
+does, unchanged. What is new is a way to read an entry as the type it means:
+`MetadataKey` (with factories for strings, ints, longs, booleans, durations and enums, and a
+`require(...)` rule on any of them) and, on `TenantRegistration`, `metadata(MetadataKey)`,
+`requireMetadata(MetadataKey)` and `validateMetadata(MetadataKey...)`.
+
+Parsing is strict on purpose. A value that is present but not valid for its key throws
+`TenantMetadataException` rather than reading as absent or as a default, so `"yes"` is not a
+boolean (it is not quietly `false`), `" 5"` is not `5`, and an enum matches its exact
+constant name. The exception names the tenant and the key and never the stored value, since
+metadata is free-form and exceptions reach logs.
+
+**Nothing breaks.** `TenantRegistration`'s components and constructor are unchanged, the
+untyped `metadata()` accessor behaves as before, and `TenantMetadataException` extends
+`TenantRegistryException`, so an existing handler for the latter still catches it. See
+[tenant registry](docs/tenant-registry.md#reading-metadata-as-typed-values).
+
+
 ### Status enforcement no longer breaks applications that have no registry table
 
 The registry bean is autoconfigured whenever a DataSource exists, so enforcing tenant status

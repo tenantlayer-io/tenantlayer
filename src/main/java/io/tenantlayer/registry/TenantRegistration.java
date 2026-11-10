@@ -2,6 +2,7 @@ package io.tenantlayer.registry;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Feature 50 — one row of the tenant registry.
@@ -38,5 +39,63 @@ public record TenantRegistration(
 
     public boolean isActive() {
         return status == TenantStatus.ACTIVE;
+    }
+
+    /**
+     * Feature 55 — one metadata entry, read as the type the key describes.
+     *
+     * <p>Absent is empty. Present but not valid for the key throws: a value that does not
+     * parse is never quietly treated as absent or as a default, because that turns a typo in
+     * a flag into a silent change of behaviour. The untyped {@link #metadata()} map is
+     * unchanged and keeps working alongside this.
+     *
+     * @throws TenantMetadataException if the entry is present and invalid for {@code key}
+     */
+    public <T> Optional<T> metadata(MetadataKey<T> key) {
+        Objects.requireNonNull(key, "key must not be null");
+        String raw = metadata.get(key.name());
+        if (raw == null) {
+            return Optional.empty();
+        }
+        try {
+            // Optional.of, not ofNullable: a parser that returns null has produced no valid
+            // value, and the NullPointerException lands in the catch below like any other
+            // rejection rather than coming back as "absent".
+            return Optional.of(key.parse(raw));
+        } catch (RuntimeException e) {
+            // No cause, and no value: a NumberFormatException quotes the input, and metadata
+            // can hold anything, including something that should never reach a log.
+            throw new TenantMetadataException(
+                    "tenant '" + tenantId + "' has metadata '" + key.name()
+                            + "' that is not valid; expected " + key.description(),
+                    null);
+        }
+    }
+
+    /**
+     * Like {@link #metadata(MetadataKey)}, for an entry the caller cannot do without.
+     *
+     * @throws TenantMetadataException if the entry is absent, or present and invalid
+     */
+    public <T> T requireMetadata(MetadataKey<T> key) {
+        return metadata(key).orElseThrow(() -> new TenantMetadataException(
+                "tenant '" + tenantId + "' has no metadata '" + key.name()
+                        + "'; expected " + key.description(),
+                null));
+    }
+
+    /**
+     * Checks every given key that is present, and returns this registration so it can sit in
+     * front of a save: {@code registry.save(registration.validateMetadata(SEATS, PLAN))}.
+     * Keys that are absent are not an error here — use {@link #requireMetadata} for that.
+     *
+     * @throws TenantMetadataException for the first present entry that is invalid
+     */
+    public TenantRegistration validateMetadata(MetadataKey<?>... keys) {
+        Objects.requireNonNull(keys, "keys must not be null");
+        for (MetadataKey<?> key : keys) {
+            metadata(key);
+        }
+        return this;
     }
 }

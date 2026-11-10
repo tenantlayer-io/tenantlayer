@@ -112,6 +112,58 @@ registry.find("acme").ifPresent(t -> registry.save(
 > [caching](caching.md#evicting-one-tenant) — otherwise a suspended tenant's data stays
 > readable until entries expire, which makes "suspended" mean less than it sounds.
 
+## Reading metadata as typed values
+
+`metadata` is a `Map<String,String>`, and it stays one — existing rows and code that reads
+the map are untouched. What a `MetadataKey` adds is a name for what one of those strings
+*means*, so the parsing happens once, in one place, instead of differently wherever it is
+needed:
+
+```java
+static final MetadataKey<Integer> SEATS = MetadataKey.ofInt("seats")
+        .require(n -> n > 0, "a positive number");
+static final MetadataKey<Boolean> SSO   = MetadataKey.ofBoolean("sso_required");
+static final MetadataKey<Plan>    PLAN  = MetadataKey.ofEnum("plan", Plan.class);
+
+TenantRegistration acme = registry.find("acme").orElseThrow();
+
+int seats            = acme.requireMetadata(SEATS);        // throws if absent or invalid
+Optional<Plan> plan  = acme.metadata(PLAN);                // empty if absent, throws if invalid
+```
+
+| Factory | Accepts |
+|---|---|
+| `ofString(name)` | The stored value as it is, including the empty string |
+| `ofInt(name)`, `ofLong(name)` | A decimal integer |
+| `ofBoolean(name)` | Exactly `true` or `false`, lower case |
+| `ofDuration(name)` | An ISO-8601 duration such as `PT30S` |
+| `ofEnum(name, Type.class)` | The exact name of one of the enum's constants |
+| `of(name, description, parser)` | Whatever your parser accepts; it must throw for a value it rejects and must not return `null` |
+
+`.require(predicate, "what a valid value looks like")` adds a rule on top of any key.
+
+**A value that is present but not valid is an error, never a default.** An absent key is
+simply empty (or an error from `requireMetadata`). But a key that is *there* and does not
+parse throws `TenantMetadataException`, because the alternative is a typo turning into a
+silent change of behaviour — `Boolean.parseBoolean("yes")` is `false`, and for a flag such as
+`sso_required` that is the insecure answer arriving without anyone having typed it. So
+parsing is strict: `"yes"` is not a boolean, `" 5"` is not `5`, and `"pro"` is not `PRO`.
+
+**The exception names the tenant and the key, never the stored value.** Metadata is
+free-form and exceptions end up in logs; a value that fails to parse is as likely to be a
+pasted secret as a typo.
+
+To check a registration before it is written, `validateMetadata` returns the registration
+after checking every given key that is present:
+
+```java
+registry.save(registration.validateMetadata(SEATS, SSO, PLAN));
+```
+
+Absent keys are not an error there; use `requireMetadata` for keys that must exist.
+`TenantMetadataException` extends `TenantRegistryException`, so an existing handler for the
+latter still catches it.
+
 ## Keeping tenants somewhere else
 
 `TenantRegistry` is an interface. If your tenants live in another service, or a
